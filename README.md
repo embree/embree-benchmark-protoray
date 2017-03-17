@@ -13,19 +13,24 @@ Running protoray
 
 Before rendering a scene in .obj format, you have to build a corresponding .mesh file:
 
-    ./protoray build mazda.obj
+    ./protoray build scene.obj
 
 
 Render with single-ray diffuse path tracing:
 
-    ./protoray render mazda.mesh -no-mtl -r diffuse
+    ./protoray render scene.mesh -no-mtl -r diffuse
 
 
 Render with packet diffuse path tracing:
 
-    ./protoray render mazda.mesh -no-mtl -r diffusePacket -size 1920,1080
+    ./protoray render scene.mesh -no-mtl -r diffusePacket -size 1920,1080
 
 
 Render with stream diffuse path tracing:
 
-    ./protoray render mazda.mesh -no-mtl -r diffuseStream -streamSize 256 -size 1920,1080
+    ./protoray render scene.mesh -no-mtl -r diffuseStream -streamSize 256 -size 1920,1080
+
+
+For benchmarking 'bvh build' and 'rendering' performance, use the following settings:
+
+    ./protoray render scene.mesh -no-mtl -r diffusePacketFast -size 3840,2160 -no-sbvh -spp 64 -benchmark bench
