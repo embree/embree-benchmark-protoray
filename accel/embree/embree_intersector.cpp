@@ -88,7 +88,7 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
     for (int buildIndex = 0; buildIndex < buildCount; ++buildIndex)
     {
       timer.reset();
-      rtcUpdate(scene,geomID);
+      if (buildCount > 1) rtcUpdate(scene,geomID);
       rtcCommit(scene);
       double buildTime = timer.query();
       if (buildCount == 1 || buildIndex >= buildWarmup)
