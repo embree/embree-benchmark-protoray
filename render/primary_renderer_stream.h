@@ -165,9 +165,9 @@ private:
 
             vint pixelId = state->pixelId.getA(i);
             if (accum)
-                frameBuffer->add(m, pixelId, color);
+                frameBuffer->add(pixelId, color);
             else
-                frameBuffer->set(m, pixelId, color);
+                frameBuffer->set(pixelId, color);
         }
     }
 

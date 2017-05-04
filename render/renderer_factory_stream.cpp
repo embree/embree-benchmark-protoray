@@ -29,7 +29,7 @@ namespace prt {
 
 ref<Renderer> RendererFactoryStream::make(const std::string& type, const ref<const Scene>& scene, const Props& props, Props& stats)
 {
-    std::string samplerType = props.get("sampler", "random");
+    std::string samplerType = getSamplerType(type, props);
 
     if (samplerType == "random")
         return makeWithSampler<RandomSamplerSimd>(type, scene, props, stats);

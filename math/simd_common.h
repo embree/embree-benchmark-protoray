@@ -21,9 +21,11 @@
 namespace prt {
 
 // Default SIMD size
-#if defined(__AVX512F__) || defined(__MIC__)
+#if (defined(__AVX512F__) || defined(__MIC__)) && !defined(FORCE_SIMD8)
+#define SIMD_SIZE 16
 const int simdSize = 16;
 #else
+#define SIMD_SIZE 8
 const int simdSize = 8;
 #endif
 

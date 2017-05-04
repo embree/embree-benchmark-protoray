@@ -22,6 +22,7 @@ namespace prt {
 
 std::string getFilenameBase(const std::string& filename);
 std::string getFilenameExt(const std::string& filename);
+std::string getFilenamePrefix(const std::string& filename);
 std::string convertFilename(const std::string& filename);
 
 std::string getTempPath();

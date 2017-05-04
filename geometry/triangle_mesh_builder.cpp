@@ -34,7 +34,7 @@ void TriangleMeshBuilder::build(const TriangleSoup& soup, TriangleMesh& mesh)
     constructMeshTopology(soup.triangles);
 
     if (isReorderEnabled)
-      reorderFragments();
+        reorderFragments();
 
     storeMesh(mesh);
     cleanup();

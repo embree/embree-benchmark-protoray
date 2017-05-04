@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include "renderer.h"
+#include "renderer_factory.h"
 
 namespace prt {
 
-class RendererFactorySingle
+class RendererFactorySingle : public RendererFactory
 {
 public:
     static ref<Renderer> make(const std::string& type, const ref<const Scene>& scene, const Props& props, Props& stats);

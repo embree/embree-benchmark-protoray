@@ -30,7 +30,7 @@ public:
     {
         stats.rayCount += bitCount(toIntMask(mask));
 
-#if defined(__AVX512F__) || defined(__MIC__)
+#if SIMD_SIZE == 16
         vint16 emask = select(mask, vint16(-1), zero);
         RTCRay16 eray;
         initRay(ray, eray);
@@ -51,7 +51,7 @@ public:
     {
         stats.rayCount += bitCount(toIntMask(mask));
 
-#if defined(__AVX512F__) || defined(__MIC__)
+#if SIMD_SIZE == 16
         vint16 emask = select(mask, vint16(-1), zero);
         RTCRay16 eray;
         initRay(ray, eray);
@@ -90,7 +90,7 @@ private:
     }
 };
 
-#if defined(__AVX512F__)
+#if SIMD_SIZE == 16
 class EmbreeIntersectorPacket8 : public IntersectorPacket, EmbreeIntersector
 {
 public:
