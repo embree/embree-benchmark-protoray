@@ -30,9 +30,9 @@ public:
 
     void intersect(Ray& ray, Hit& hit, RayStats& stats)
     {
-        stats.rayCount++;
 
         RTCRay eray;
+        stats.rayCount++;
         initRay(ray, eray);
         rtcIntersect(scene, eray);
 

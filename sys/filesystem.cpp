@@ -34,6 +34,14 @@ std::string getFilenameExt(const std::string& filename)
     return filename.substr(filename.find_last_of('.') + 1);
 }
 
+std::string getFilenamePrefix(const std::string& filename)
+{
+    auto pos = filename.find_last_of("/\\");
+    if (pos == std::string::npos)
+        return "";
+    return filename.substr(0, pos+1);
+}
+
 std::string convertFilename(const std::string& filename)
 {
     std::string newFilename = filename;

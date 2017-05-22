@@ -16,38 +16,14 @@
 
 #pragma once
 
-#include "math/vec2.h"
-#include "math/basis3.h"
-#include "core/ray.h"
-#include "core/ray_simd.h"
+#include "renderer.h"
 
 namespace prt {
 
-struct CameraSample
+class RendererFactory
 {
-    Vec2f image;
-    Vec2f lens;
-
-    FORCEINLINE CameraSample() {}
-    FORCEINLINE CameraSample(const Vec2f& image, const Vec2f& lens) : image(image), lens(lens) {}
-};
-
-struct CameraSampleSimd
-{
-    Vec2vf image;
-    Vec2vf lens;
-
-    FORCEINLINE CameraSampleSimd() {}
-    FORCEINLINE CameraSampleSimd(const Vec2vf& image, const Vec2vf& lens) : image(image), lens(lens) {}
-};
-
-class Camera
-{
-public:
-    virtual ~Camera() {}
-
-    virtual void getRay(Ray& ray, const CameraSample& s) const = 0;
-    virtual void getRay(RaySimd& ray, const CameraSampleSimd& s) const = 0;
+protected:
+    static std::string getSamplerType(const std::string& type, const Props& props);
 };
 
 } // namespace prt

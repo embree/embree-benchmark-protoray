@@ -30,8 +30,12 @@ if(APPLE)
 endif()
 
 set(HOST_ISA "CORE-AVX2" CACHE STRING "ISA")
-
 set(HOST_CXX_FLAGS "-x${HOST_ISA}")
+
+option(FORCE_SIMD8 "Force 8-wide SIMD" OFF)
+if(FORCE_SIMD8)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFORCE_SIMD8")
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
@@ -143,6 +147,8 @@ set(SRC_COMMON
     render/intersector_factory_packet.cpp
     render/intersector_factory_packet.h
     render/intersector_factory_stream.h
+    render/renderer_factory.cpp
+    render/renderer_factory.h
     render/renderer_factory_single.cpp
     render/renderer_factory_single.h
     render/renderer_factory_packet.cpp

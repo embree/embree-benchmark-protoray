@@ -14,40 +14,25 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
-#pragma once
-
-#include "math/vec2.h"
-#include "math/basis3.h"
-#include "core/ray.h"
-#include "core/ray_simd.h"
+#include "sys/logging.h"
+#include "renderer_factory.h"
 
 namespace prt {
 
-struct CameraSample
+std::string RendererFactory::getSamplerType(const std::string& type, const Props& props)
 {
-    Vec2f image;
-    Vec2f lens;
+    std::string samplerType = props.get("sampler", "default");
 
-    FORCEINLINE CameraSample() {}
-    FORCEINLINE CameraSample(const Vec2f& image, const Vec2f& lens) : image(image), lens(lens) {}
-};
+    if (samplerType == "default")
+    {
+        if (type.find("path") == 0)
+            samplerType = "sobol";
+        else
+            samplerType = "random";
+    }
 
-struct CameraSampleSimd
-{
-    Vec2vf image;
-    Vec2vf lens;
-
-    FORCEINLINE CameraSampleSimd() {}
-    FORCEINLINE CameraSampleSimd(const Vec2vf& image, const Vec2vf& lens) : image(image), lens(lens) {}
-};
-
-class Camera
-{
-public:
-    virtual ~Camera() {}
-
-    virtual void getRay(Ray& ray, const CameraSample& s) const = 0;
-    virtual void getRay(RaySimd& ray, const CameraSampleSimd& s) const = 0;
-};
+    Log() << "Sampler: " << samplerType;
+    return samplerType;
+}
 
 } // namespace prt

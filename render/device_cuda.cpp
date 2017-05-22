@@ -67,7 +67,10 @@ void DeviceCuda::initRenderer(const Props& props, Props& stats)
     Vec2i imageSize = props.get<Vec2i>("imageSize");
     int pixelCount = imageSize.x * imageSize.y;
 
-    std::string samplerType = props.get("sampler", "random");
+    std::string samplerType = props.get("sampler", "default");
+    if (samplerType == "default")
+        samplerType = "random";
+    Log() << "Sampler: " << samplerType;
     if (samplerType != "random")
         throw std::invalid_argument("invalid sampler type");
 

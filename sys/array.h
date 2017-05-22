@@ -155,7 +155,21 @@ public:
         // Reallocate and move data
         T* oldItems = items;
         items = (T*)alignedAlloc(capacity * sizeof(T));
-        memcpy(items, oldItems, size * sizeof(T));
+
+        if (is_trivially_copy_constructible<T>::value)
+        {
+            memcpy(items, oldItems, size * sizeof(T));
+        }
+        else
+        {
+            // Slow!
+            for (int i = 0; i < size; ++i)
+            {
+                new (items + i) T(std::move(oldItems[i]));
+                oldItems[i].~T();
+            }
+        }
+
         alignedFree(oldItems);
 	}
 

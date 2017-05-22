@@ -24,11 +24,16 @@ OptixIntersectorStreamCuda::OptixIntersectorStreamCuda(const TriangleMeshCuda& m
 {
     TimerCuda timer;
     bool isBenchmark = props.exists("benchmark");
-    int buildCount = props.get("buildCount", isBenchmark ? 9 : 1);
+    int buildCount = props.get("buildCount", isBenchmark ? 12 : 1);
+    int buildWarmup = props.get("buildWarmup", buildCount / 6);
 
     // Create context
     Log() << "Creating OptiX Prime context";
     context = optix::prime::Context::create(RTP_CONTEXT_TYPE_CUDA);
+
+    // Use only the first CUDA device
+    std::vector<unsigned> devNums = {0};
+    context->setCudaDeviceNumbers(devNums);
 
     // Create model
     model = context->createModel();
@@ -37,7 +42,7 @@ OptixIntersectorStreamCuda::OptixIntersectorStreamCuda(const TriangleMeshCuda& m
     if (buildCount == 1)
         Log() << "Building acceleration structure";
     else
-        Log() << "Building acceleration structure (multiple times)";
+        Log() << "Building acceleration structure (" << buildCount << "x)";
 
     double buildTimeSum = 0.0;
     for (int buildIndex = 0; buildIndex < buildCount; ++buildIndex)
@@ -48,12 +53,12 @@ OptixIntersectorStreamCuda::OptixIntersectorStreamCuda(const TriangleMeshCuda& m
         timer.start();
         model->update(0);
         double buildTime = timer.stop();
-        if (buildCount == 1 || buildIndex > 0)
+        if (buildCount == 1 || buildIndex >= buildWarmup)
             buildTimeSum += buildTime;
     }
 
     // Stats
-    double buildTimeAvg = (buildCount == 1) ? buildTimeSum : (buildTimeSum / double(buildCount-1));
+    double buildTimeAvg = (buildCount == 1) ? buildTimeSum : (buildTimeSum / double(max(buildCount-buildWarmup, 0)));
     double buildMsAvg = buildTimeAvg * 1000.0;
     double buildMprimAvg = double(mesh.triangleCount) / 1000000.0 / buildTimeAvg;
 

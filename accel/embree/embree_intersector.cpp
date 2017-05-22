@@ -68,58 +68,31 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
     else
         Log() << "Building acceleration structure (" << buildCount << "x)";
 
+    geomID = rtcNewTriangleMesh(scene, RTC_GEOMETRY_STATIC, mesh->indices.getSize(), mesh->vertexCount, 1);
+
+    Vec3i* triangles = (Vec3i*)rtcMapBuffer(scene, geomID, RTC_INDEX_BUFFER);
+    for (int i = 0; i < mesh->indices.getSize(); ++i)
+        triangles[i] = mesh->indices[i];
+    rtcUnmapBuffer(scene, geomID, RTC_INDEX_BUFFER);
+
+    Vec4f* vertices = (Vec4f*)rtcMapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
+    for (int i = 0; i < mesh->vertexCount; ++i)
+        vertices[i] = Vec4f(mesh->getPosition(i), 0.0f);
+    rtcUnmapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
+
     Timer timer;
     double buildTimeSum = 0.0;
 
-#if 1
-
-    geomID = rtcNewTriangleMesh(scene, RTC_GEOMETRY_STATIC, mesh->indices.getSize(), mesh->vertexCount, 1);
-    
-    Vec3i* triangles = (Vec3i*)rtcMapBuffer(scene, geomID, RTC_INDEX_BUFFER);
-    for (int i = 0; i < mesh->indices.getSize(); ++i)
-      triangles[i] = mesh->indices[i];
-    rtcUnmapBuffer(scene, geomID, RTC_INDEX_BUFFER);
-    
-    Vec4f* vertices = (Vec4f*)rtcMapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
-    for (int i = 0; i < mesh->vertexCount; ++i)
-      vertices[i] = Vec4f(mesh->getPosition(i), 0.0f);
-    rtcUnmapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
-
     for (int buildIndex = 0; buildIndex < buildCount; ++buildIndex)
     {
-      timer.reset();
-      if (buildCount > 1) rtcUpdate(scene,geomID);
-      rtcCommit(scene);
-      double buildTime = timer.query();
-      if (buildCount == 1 || buildIndex >= buildWarmup)
-        buildTimeSum += buildTime;
-    }
-
-#else
-    for (int buildIndex = 0; buildIndex < buildCount; ++buildIndex)
-    {
-        geomID = rtcNewTriangleMesh(scene, RTC_GEOMETRY_STATIC, mesh->indices.getSize(), mesh->vertexCount, 1);
-
-        Vec3i* triangles = (Vec3i*)rtcMapBuffer(scene, geomID, RTC_INDEX_BUFFER);
-        for (int i = 0; i < mesh->indices.getSize(); ++i)
-            triangles[i] = mesh->indices[i];
-        rtcUnmapBuffer(scene, geomID, RTC_INDEX_BUFFER);
-
-        Vec4f* vertices = (Vec4f*)rtcMapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
-        for (int i = 0; i < mesh->vertexCount; ++i)
-            vertices[i] = Vec4f(mesh->getPosition(i), 0.0f);
-        rtcUnmapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
-
         timer.reset();
+        rtcUpdate(scene, geomID);
         rtcCommit(scene);
         double buildTime = timer.query();
         if (buildCount == 1 || buildIndex >= buildWarmup)
             buildTimeSum += buildTime;
-
-        if (buildIndex < buildCount-1)
-            rtcDeleteGeometry(scene, geomID);
     }
-#endif
+
     // Stats
     double buildTimeAvg = (buildCount == 1) ? buildTimeSum : (buildTimeSum / double(max(buildCount-buildWarmup, 0)));
     double buildMsAvg = buildTimeAvg * 1000.0;

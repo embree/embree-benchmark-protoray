@@ -1,6 +1,6 @@
-if [ "$#" -ne 1 ]
+if [ "$#" -ne 1 ] && [ "$#" -ne 2 ]
 then
-    echo "Usage: $0 (embree|optix)"
+    echo "Usage: $0 (embree|optix) [scene]"
     exit 1
 fi
 
@@ -25,6 +25,11 @@ scenes="mazda villa artdeco powerplant sanmiguel"
 resolution=3840,2160
 spp=64
 
+if [ "$#" -eq 2 ]
+then
+    scenes="$2"
+fi
+
 line="scene,renderMray,buildMprim"
 echo "$line" > $result.csv
 
@@ -38,3 +43,6 @@ do
     line="$scene,$stats_mray,$stats_buildMprim"
     echo "$line" >> $result.csv
 done
+
+echo
+cat $result.csv
