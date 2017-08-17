@@ -93,7 +93,7 @@ public:
         Vec2i tileSize = Vec2i(tileSizeX, tileSizeY);
         Vec2i gridSize = (imageSize + tileSize - 1) / tileSize;
         Timer timer;
-        Tasking::run(gridSize, [this](const Vec2i& tileId, int tid) { renderTile(tileId, tid); });
+        Tasking::run(gridSize, [this](const Vec2i& tileId, int tid) {  renderTile(tileId, tid); });
         double totalTime = timer.query();
 
         // Stats

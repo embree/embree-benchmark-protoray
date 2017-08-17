@@ -36,6 +36,7 @@ public:
         rtcIntersect16(&emask, scene, eray);
 #else
         RTCRay8 eray;
+        stats.rayCount += bitCount(toIntMask(mask));
         initRay(ray, eray);
         rtcIntersect8(&mask, scene, eray);
 #endif
