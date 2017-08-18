@@ -65,7 +65,7 @@ RenderWindow::RenderWindow(int width, int height, DisplayMode mode, const ref<De
     prevTone.ev = 0;
     prevTone.burn = 0;
 
-    isTextEnabled = props.exists("overlay");
+    isTextEnabled = !props.exists("no-overlay");
     isFrameStatsPrinted = false;
     currentFps = 0.0;
     currentMray = 0.0;
@@ -316,7 +316,7 @@ void RenderWindow::saveScreenshot(const std::string& filename)
     surface.pitch = imageSize.x * 4;
     surface.data = image.getData();
     device->updateFrame(surface);
-    saveImage(filename, image);
+    saveImage(filename + ".ppm", image);
 }
 
 void RenderWindow::saveAutoScreenshot()

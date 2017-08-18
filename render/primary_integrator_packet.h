@@ -35,7 +35,7 @@ public:
     {
         HitSimd hit;
         vbool active = one;
-        intersector->intersect(active, ray, hit, state.rayStats);
+        intersector->intersect(active, ray, hit, state.rayStats, rayHintCoherent);
         active = ray.isHit();
 
         Vec3vf color;

@@ -34,7 +34,7 @@ public:
 
     Vec3f getColor(Ray& ray, IntersectorSingle* intersector, const Scene* scene, Sampler& sampler, IntegratorState<Sampler>& state)
     {
-        intersector->occluded(ray, state.rayStats);
+        intersector->occluded(ray, state.rayStats, rayHintCoherent);
         return ray.isHit() ? Vec3f(1.0f, 0.5f, 0.0f) : 0.05f;
     }
 };

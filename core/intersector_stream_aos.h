@@ -17,17 +17,18 @@
 #pragma once
 
 #include "intersector.h"
-#include "ray.h"
+#include "ray_stream_aos.h"
 
 namespace prt {
 
-class IntersectorSingle
+template <int streamSize>
+class IntersectorStreamAos
 {
 public:
-    virtual ~IntersectorSingle() {}
+    virtual ~IntersectorStreamAos() {}
 
-    virtual void intersect(Ray& ray, Hit& hit, RayStats& stats, RayHint hint = rayHintDefault) = 0;
-    virtual void occluded(Ray& ray, RayStats& stats, RayHint hint = rayHintDefault) = 0;
+    virtual void intersect(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint = rayHintDefault) = 0;
+    virtual void occluded(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint = rayHintDefault) = 0;
 };
 
 } // namespace prt

@@ -20,22 +20,23 @@
 #include "sys/tasking.h"
 #include "sys/sysinfo.h"
 #include "sys/timer.h"
+#include "core/ray_stream.h"
 #include "image/pixel.h"
 #include "image/morton.h"
 #include "sampling/shape_sampler.h"
-#include "renderer_stream.h"
+#include "renderer_stream_aos.h"
 
 //#include "/opt/iaca/include/iacaMarks.h"
 
 namespace prt {
 
 template <class ShadingContextT, class Sampler, bool accum, int streamSize, int tileSizeX, int tileSizeY>
-class DiffuseRendererStream : public Renderer, IntegratorBase
+class DiffuseRendererStreamAos : public Renderer, IntegratorBase
 {
 private:
     struct StateIo
     {
-        RayStream<streamSize> ray;
+        RayHitStreamAos<streamSize> ray;
         RayStreamChannel<float, streamSize> throughput;
         RayStreamChannel<int, streamSize> pixelId;
     };
@@ -43,14 +44,13 @@ private:
     struct State
     {
         RayStreamChannel<int, streamSize> pathId;
-        HitStream<streamSize> hit;
         StateIo io[2];
         typename Sampler::State sampler;
         RayStats rayStats;
     };
 
     Sampler sampler;
-    ref<IntersectorStream<streamSize>> intersector;
+    ref<IntersectorStreamAos<streamSize>> intersector;
     ref<const Scene> scene;
     const Camera* camera;
     FrameBuffer* frameBuffer;
@@ -61,7 +61,7 @@ private:
     bool isStatic;
 
 public:
-    DiffuseRendererStream(const ref<const Scene>& scene, const ref<IntersectorStream<streamSize>>& intersector, const Props& props)
+    DiffuseRendererStreamAos(const ref<const Scene>& scene, const ref<IntersectorStreamAos<streamSize>>& intersector, const Props& props)
     {
         this->scene = scene;
         this->intersector = intersector;
@@ -84,7 +84,7 @@ public:
     void render(const Camera* camera, FrameBuffer* frameBuffer, Props& stats)
     {
         if (frameBuffer->getSize() != imageSize)
-            throw std::invalid_argument("DiffuseRendererStream: framebuffer size mismatch");
+            throw std::invalid_argument("DiffuseRendererStreamAos: framebuffer size mismatch");
 
         this->camera = camera;
         this->frameBuffer = frameBuffer;
@@ -132,95 +132,89 @@ private:
         int croppedTileSizeY = min(imageSize.y - tileLow.y, tileSizeY);
 
         int rayCount = tileSizeX*croppedTileSizeY;
-        for (int i = 0; i < rayCount; i += simdSize)
+        for (int i = 0; i < rayCount; ++i)
         {
             //Vec2vi pixel;
             //pixel.x = load(mortonTableX + i) + tileLow.x;
             //pixel.y = load(mortonTableY + i) + tileLow.y;
-            Vec2vi pixel = getMorton8x8Step<tileSizeX>(i) + Vec2vi(tileLow);
-            vint pixelId = pixel.x + pixel.y * frameBuffer->getSize().x;
-            stateI->pixelId.setA(i, pixelId);
+            Vec2i pixel = getMorton8x8<tileSizeX>(i) + Vec2i(tileLow);
+            int pixelId = pixel.x + pixel.y * frameBuffer->getSize().x;
+            stateI->pixelId[i] = pixelId;
 
-            sampler.setSample(one, state->sampler, pass, pixelId);
+            sampler.setSample(state->sampler, pass, pixelId);
 
-            CameraSampleSimd cameraSample;
-            Vec2vf pixelSample = sampler.get2D(state->sampler, sampleDimPixel);
-            cameraSample.image = (toFloat(pixel) + pixelSample) * Vec2vf(frameBuffer->getInvSize());
+            CameraSample cameraSample;
+            Vec2f pixelSample = sampler.get2D(state->sampler, sampleDimPixel);
+            cameraSample.image = (toFloat(pixel) + pixelSample) * Vec2f(frameBuffer->getInvSize());
             cameraSample.lens = sampler.get2D(state->sampler, sampleDimLens);
 
-            RaySimd ray;
+            Ray ray;
             camera->getRay(ray, cameraSample);
 
-            stateI->ray.setA(i, ray);
-            stateI->throughput.setA(i, 1.0f);
+            stateI->ray.set(i, ray);
+            stateI->throughput[i] = 1.0f;
         }
-
-        //int matCount = scene->getMaterialCount();
-        int matCount = 0; // FIXME!!!!!!!!!
 
         int depth = 0;
         for (;;)
         {
             // Intersect rays
-            intersector->intersect(stateI->ray, state->hit, rayCount, state->rayStats);
+            intersector->intersect(stateI->ray, rayCount, state->rayStats);
 
             // Sort
             int missCount = rayStreamSort(stateI->ray, state->pathId.get(), rayCount);
 
             // No hits
-            for (int i = 0; i < missCount; i += simdSize)
+            for (int i = 0; i < missCount; ++i)
             {
-                vbool m = (vint(step) + i) < missCount;
-                vint pathId = state->pathId.get(i);
+                int pathId = state->pathId[i];
 
-                vint pixelId = stateI->pixelId.get(m, pathId);
-                vfloat throughput = stateI->throughput.get(m, pathId);
+                int pixelId = stateI->pixelId[pathId];
+                float throughput = stateI->throughput[pathId];
                 if (accum)
-                    frameBuffer->add(m, pixelId, Vec3vf(throughput));
+                    frameBuffer->add(pixelId, Vec3f(throughput));
                 else
-                    frameBuffer->set(m, pixelId, Vec3vf(throughput));
+                    frameBuffer->set(pixelId, Vec3f(throughput));
             }
 
             if (missCount == rayCount) break;
             if (depth == maxDepth)
             {
-                for (int i = missCount; i < rayCount; i += simdSize)
+                for (int i = missCount; i < rayCount; ++i)
                 {
-                    vbool m = (vint(step) + i) < rayCount;
-                    vint pathId = state->pathId.get(i);
-                    vint pixelId = stateI->pixelId.get(m, pathId);
+                    int pathId = state->pathId[i];
+                    int pixelId = stateI->pixelId[pathId];
                     if (accum)
-                        frameBuffer->add(m, pixelId, Vec3vf(zero));
+                        frameBuffer->add(pixelId, Vec3f(zero));
                     else
-                        frameBuffer->set(m, pixelId, Vec3vf(zero));
+                        frameBuffer->set(pixelId, Vec3f(zero));
                 }
                 break;
             }
 
             // Hits
-            for (int i = missCount, o = 0; i < rayCount; i += simdSize, o += simdSize)
+            for (int i = missCount, o = 0; i < rayCount; ++i, ++o)
             {
-                vbool m = (vint(step) + i) < rayCount;
-                vint pathId = state->pathId.get(i);
+                int pathId = state->pathId[i];
 
-                RaySimd ray;
-                HitSimd hit;
-                stateI->ray.get(m, pathId, ray);
-                state->hit.get(m, pathId, hit);
+                Ray ray;
+                Hit hit;
+                stateI->ray.getRay(pathId, ray);
+                stateI->ray.getHit(pathId, hit);
 
                 ShadingContextT ctx;
-                scene->postIntersect(m, ray, hit, ctx);
+                scene->postIntersect(ray, hit, ctx);
 
-                vint pixelId = stateI->pixelId.get(m, pathId);
-                sampler.resetSample(m, state->sampler, pass, pixelId);
-                Vec2vf s = sampler.get2D(state->sampler, sampleDimBaseSize + 2 * depth);
+                int pixelId = stateI->pixelId[pathId];
+                sampler.resetSample(state->sampler, pass, pixelId);
+                Vec2f s = sampler.get2D(state->sampler, sampleDimBaseSize + 2 * depth);
                 ray.init(ctx.p, ctx.getBasis() * cosineSampleHemisphere(s), ctx.eps);
                 stateO->ray.set(o, ray);
 
-                vfloat throughput = stateI->throughput.get(m, pathId);
+                float throughput = stateI->throughput[pathId];
                 throughput *= 0.8f;
-                stateO->throughput.set(o, throughput);
-                stateO->pixelId.set(o, pixelId);
+                stateO->throughput[o] = throughput;
+                stateO->pixelId[o] = pixelId;
             }
 
             rayCount -= missCount;
@@ -232,7 +226,7 @@ private:
 public:
     Props queryPixel(const Camera* camera, int x, int y)
     {
-        return RendererStream::queryPixel(intersector, imageSize, camera, x, y);
+        return RendererStreamAos::queryPixel(intersector, imageSize, camera, x, y);
     }
 };
 

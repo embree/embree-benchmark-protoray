@@ -18,7 +18,6 @@
 #include "sys/filesystem.h"
 
 #ifdef EMBREE_SUPPORT
-#include "accel/embree/embree_intersector_single.h"
 #include "accel/embree/embree_intersector_packet.h"
 #endif
 

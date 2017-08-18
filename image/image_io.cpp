@@ -51,36 +51,37 @@ bool ImageIo::save(const std::string& filename, const ImageIo::Desc& desc, const
 {
     Log() << "Saving image: " << filename;
 
-    // Only PPM is supported
-    if (desc.format != pixelFormatBgr8 || getFilenameExt(filename) != "ppm")
+    // Always use our own PPM writer
+    if (desc.format == pixelFormatBgr8 && getFilenameExt(filename) == "ppm")
     {
-        LogError() << "Unsupported image file format";
-        return false;
-    }
-
-    FILE* file = fopen(filename.c_str(), "wb");
-    if (file == 0)
-    {
-        LogError() << "Could not save image";
-        return false;
-    }
-
-    fprintf(file, "P6\n%d %d\n255\n", desc.size.x, desc.size.y);
-
-    for (int y = 0; y < desc.size.y; ++y)
-    {
-        const Vec4uc* inLine = (const Vec4uc*)data + y * desc.size.x;
-
-        for (int x = 0; x < desc.size.x; ++x)
+        FILE* file = fopen(filename.c_str(), "wb");
+        if (file == 0)
         {
-            fputc(inLine[x].x, file);
-            fputc(inLine[x].y, file);
-            fputc(inLine[x].z, file);
+            LogError() << "Could not save image";
+            return false;
         }
+
+        fprintf(file, "P6\n%d %d\n255\n", desc.size.x, desc.size.y);
+
+        for (int y = 0; y < desc.size.y; ++y)
+        {
+            const Vec4uc* inLine = (const Vec4uc*)data + y * desc.size.x;
+
+            for (int x = 0; x < desc.size.x; ++x)
+            {
+                fputc(inLine[x].x, file);
+                fputc(inLine[x].y, file);
+                fputc(inLine[x].z, file);
+            }
+        }
+
+        fclose(file);
+        return true;
     }
 
-    fclose(file);
-    return true;
+    // Only PPM is supported
+    LogError() << "Unsupported image file format";
+    return false;
 }
 
 } // namespace prt

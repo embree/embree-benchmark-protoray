@@ -140,13 +140,16 @@ set(SRC_COMMON
     render/renderer_single.h
     render/renderer_packet.h
     render/renderer_stream.h
+    render/renderer_stream_aos.h
     render/primary_renderer_stream.h
     render/diffuse_renderer_stream.h
+    render/diffuse_renderer_stream_aos.h
     render/intersector_factory_single.cpp
     render/intersector_factory_single.h
     render/intersector_factory_packet.cpp
     render/intersector_factory_packet.h
     render/intersector_factory_stream.h
+    render/intersector_factory_stream_aos.h
     render/renderer_factory.cpp
     render/renderer_factory.h
     render/renderer_factory_single.cpp
@@ -199,10 +202,13 @@ set(SRC_COMMON
     core/intersector_single.h
     core/intersector_packet.h
     core/intersector_stream.h
+    core/intersector_stream_aos.h
     core/post_intersector.h
     core/ray.h
     core/ray_simd.h
     core/ray_stream.h
+    core/ray_stream_aos.h
+    core/ray_embree.h
     core/ray_stats.h
     core/shading_context.h
     sampling/shape_sampler.h
@@ -257,6 +263,7 @@ if(EMBREE_SUPPORT)
         accel/embree/embree_intersector_single.h
         accel/embree/embree_intersector_packet.h
         accel/embree/embree_intersector_stream.h
+        accel/embree/embree_intersector_stream_aos.h
     )
 endif()
 

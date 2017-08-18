@@ -26,8 +26,8 @@ class IntersectorPacket
 public:
     virtual ~IntersectorPacket() {}
 
-    virtual void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats) = 0;
-    virtual void occluded(vbool mask, RaySimd& ray, RayStats& stats) = 0;
+    virtual void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats, RayHint hint = rayHintDefault) = 0;
+    virtual void occluded(vbool mask, RaySimd& ray, RayStats& stats, RayHint hint = rayHintDefault) = 0;
 };
 
 } // namespace prt

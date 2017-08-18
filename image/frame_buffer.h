@@ -41,10 +41,8 @@ public:
     void clear();
     void update(Surface& surface);
 
-    FORCEINLINE void add(const Vec2i& p, const Vec3f& c)
+    FORCEINLINE void add(int index, const Vec3f& c)
     {
-        size_t index = p.y * size.x + p.x;
-
         float r = accumBuffer[0][index] + c[0];
         float g = accumBuffer[1][index] + c[1];
         float b = accumBuffer[2][index] + c[2];
@@ -54,6 +52,12 @@ public:
         accumBuffer[1][index] = g;
         accumBuffer[2][index] = b;
         accumBuffer[3][index] = w;
+    }
+
+    FORCEINLINE void add(const Vec2i& p, const Vec3f& c)
+    {
+        int index = p.y * size.x + p.x;
+        add(index, c);
     }
 
     FORCEINLINE void add(vint index, const Vec3vf& c)
@@ -131,14 +135,18 @@ public:
         add(p.y * size.x + p.x, c);
     }
 
-    FORCEINLINE void set(const Vec2i& p, const Vec3f& c)
+    FORCEINLINE void set(int index, const Vec3f& c)
     {
-        size_t index = p.y * size.x + p.x;
-
         accumBuffer[0][index] = c[0];
         accumBuffer[1][index] = c[1];
         accumBuffer[2][index] = c[2];
         accumBuffer[3][index] = 1.0f;
+    }
+
+    FORCEINLINE void set(const Vec2i& p, const Vec3f& c)
+    {
+        int index = p.y * size.x + p.x;
+        set(index, c);
     }
 
     FORCEINLINE void set(vint index, const Vec3vf& c)

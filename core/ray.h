@@ -89,8 +89,8 @@ struct Ray
 struct Hit
 {
     int primId; // primitive ID
-    float u;    // u coord
-    float v;    // v coord
+    float u;    // barycentric u coordinate
+    float v;    // barycentric v coordinate
 
     FORCEINLINE int*   getPrimId() { return &primId; }
     FORCEINLINE float* getU()      { return &u; }

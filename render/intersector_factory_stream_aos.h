@@ -19,21 +19,21 @@
 #include "sys/props.h"
 #include "sys/blob.h"
 #include "sys/filesystem.h"
-#include "core/intersector_stream.h"
+#include "core/intersector_stream_aos.h"
 
 #ifdef EMBREE_SUPPORT
-#include "accel/embree/embree_intersector_stream.h"
+#include "accel/embree/embree_intersector_stream_aos.h"
 #endif
 
 #include "scene.h"
 
 namespace prt {
 
-class IntersectorFactoryStream
+class IntersectorFactoryStreamAos
 {
 public:
     template <int streamSize>
-    static ref<IntersectorStream<streamSize>> make(const ref<const Scene>& scene, const Props& props, Props& stats)
+    static ref<IntersectorStreamAos<streamSize>> make(const ref<const Scene>& scene, const Props& props, Props& stats)
     {
         // Load the acceleration structure
         std::string defaultAccelType = "embree";
@@ -51,11 +51,9 @@ public:
         if (accelType == "embree")
         {
             if (isectType == "single")
-                return makeRef<EmbreeIntersectorSingleStream<streamSize>>(scene->shape, props, stats);
-            if (isectType == "packet")
-                return makeRef<EmbreeIntersectorPacketStream<streamSize>>(scene->shape, props, stats);
+                return makeRef<EmbreeIntersectorSingleStreamAos<streamSize>>(scene->shape, props, stats);
             if (isectType == "stream")
-                return makeRef<EmbreeIntersectorStream<streamSize>>(scene->shape, props, stats);
+                return makeRef<EmbreeIntersectorStreamAos<streamSize>>(scene->shape, props, stats);
 
             throw std::invalid_argument("invalid intersector type");
         }

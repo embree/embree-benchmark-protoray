@@ -26,19 +26,22 @@ class EmbreeIntersectorPacket : public IntersectorPacket, EmbreeIntersector
 public:
     EmbreeIntersectorPacket(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
 
-    void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats)
+    void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats, RayHint hint)
     {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += bitCount(toIntMask(mask));
+
 #if SIMD_SIZE == 16
         vint16 emask = select(mask, vint16(-1), zero);
         RTCRay16 eray;
-        stats.rayCount += bitCount(toIntMask(mask));
         initRay(ray, eray);
-        rtcIntersect16(&emask, scene, eray);
+        rtcIntersect16Ex(&emask, scene, &context, eray);
 #else
         RTCRay8 eray;
-        stats.rayCount += bitCount(toIntMask(mask));
         initRay(ray, eray);
-        rtcIntersect8(&mask, scene, eray);
+        rtcIntersect8Ex(&mask, scene, &context, eray);
 #endif
 
         ray.far = load(eray.tfar);
@@ -47,19 +50,22 @@ public:
         hit.v = load(eray.v);
     }
 
-    void occluded(vbool mask, RaySimd& ray, RayStats& stats)
+    void occluded(vbool mask, RaySimd& ray, RayStats& stats, RayHint hint)
     {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
         stats.rayCount += bitCount(toIntMask(mask));
 
 #if SIMD_SIZE == 16
         vint16 emask = select(mask, vint16(-1), zero);
         RTCRay16 eray;
         initRay(ray, eray);
-        rtcOccluded16(&emask, scene, eray);
+        rtcOccluded16Ex(&emask, scene, &context, eray);
 #else
         RTCRay8 eray;
         initRay(ray, eray);
-        rtcOccluded8(&mask, scene, eray);
+        rtcOccluded8Ex(&mask, scene, &context, eray);
 #endif
 
         vbool hitMask = load((int*)eray.geomID) == vint(zero);
@@ -96,8 +102,11 @@ class EmbreeIntersectorPacket8 : public IntersectorPacket, EmbreeIntersector
 public:
     EmbreeIntersectorPacket8(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
 
-    void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats)
+    void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats, RayHint hint)
     {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
         stats.rayCount += bitCount(toIntMask(mask));
 
         vint emask = select(mask, vint(-1), zero);
@@ -105,7 +114,7 @@ public:
         {
             RTCRay8 eray;
             initRay(ray, i, eray);
-            rtcIntersect8(&emask[i], scene, eray);
+            rtcIntersect8Ex(&emask[i], scene, &context, eray);
 
             store(&ray.far[i],    load<8>(eray.tfar));
             store(&hit.primId[i], load<8>((int*)eray.primID));
@@ -114,8 +123,11 @@ public:
         }
     }
 
-    void occluded(vbool mask, RaySimd& ray, RayStats& stats)
+    void occluded(vbool mask, RaySimd& ray, RayStats& stats, RayHint hint)
     {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
         stats.rayCount += bitCount(toIntMask(mask));
 
         vint emask = select(mask, vint(-1), zero);
@@ -123,7 +135,7 @@ public:
         {
             RTCRay8 eray;
             initRay(ray, i, eray);
-            rtcOccluded8(&emask[i], scene, eray);
+            rtcOccluded8Ex(&emask[i], scene, &context, eray);
 
             vbool8 hitMask = load<8>((int*)eray.geomID) == vint8(zero);
             store(hitMask, &ray.far[i], vfloat8(zero));
@@ -155,5 +167,75 @@ private:
 #elif !defined(__MIC__)
 typedef EmbreeIntersectorPacket EmbreeIntersectorPacket8;
 #endif
+
+class EmbreeIntersectorSinglePacket : public IntersectorPacket, EmbreeIntersector
+{
+public:
+    EmbreeIntersectorSinglePacket(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
+
+    void intersect(vbool mask, RaySimd& ray, HitSimd& hit, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        int intMask = toIntMask(mask);
+        stats.rayCount += bitCount(intMask);
+
+        int i = -1;
+        while ((i = bitScan(intMask, i)) < simdSize)
+        {
+            RTCRay eray;
+            initRay(ray, i, eray);
+            rtcIntersect1Ex(scene, &context, eray);
+
+            ray.far[i] = eray.tfar;
+            hit.primId[i] = eray.primID;
+            hit.u[i] = eray.u;
+            hit.v[i] = eray.v;
+        }
+    }
+
+    void occluded(vbool mask, RaySimd& ray, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        int intMask = toIntMask(mask);
+        stats.rayCount += bitCount(intMask);
+
+        int i = -1;
+        while ((i = bitScan(intMask, i)) < simdSize)
+        {
+            RTCRay eray;
+            initRay(ray, i, eray);
+            rtcOccluded1Ex(scene, &context, eray);
+
+            if (eray.geomID == 0)
+                ray.far[i] = 0.0f;
+        }
+    }
+
+private:
+    FORCEINLINE void initRay(const RaySimd& ray, int i, RTCRay& eray)
+    {
+        eray.org[0] = ray.org.x[i];
+        eray.org[1] = ray.org.y[i];
+        eray.org[2] = ray.org.z[i];
+
+        eray.dir[0] = ray.dir.x[i];
+        eray.dir[1] = ray.dir.y[i];
+        eray.dir[2] = ray.dir.z[i];
+
+        eray.tnear = 0.0f;
+        eray.tfar = ray.far[i];
+
+        eray.geomID = RTC_INVALID_GEOMETRY_ID;
+        eray.primID = RTC_INVALID_GEOMETRY_ID;
+        //eray.instID = RTC_INVALID_GEOMETRY_ID;
+
+        eray.mask = -1;
+        eray.time = 0.0f;
+    }
+};
 
 } // namespace prt

@@ -1,0 +1,80 @@
+// ======================================================================== //
+// Copyright 2015-2017 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
+
+#pragma once
+
+#include "core/intersector_stream_aos.h"
+#include "embree_intersector.h"
+
+namespace prt {
+
+template <int streamSize>
+class EmbreeIntersectorStreamAos : public IntersectorStreamAos<streamSize>, EmbreeIntersector
+{
+public:
+    EmbreeIntersectorStreamAos(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
+
+    void intersect(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += count;
+
+        rtcIntersect1M(scene, &context, rays.get(), count, sizeof(RTCRay));
+    }
+
+    void occluded(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += count;
+
+        rtcOccluded1M(scene, &context, rays.get(), count, sizeof(RTCRay));
+    }
+};
+
+template <int streamSize>
+class EmbreeIntersectorSingleStreamAos : public IntersectorStreamAos<streamSize>, EmbreeIntersector
+{
+public:
+    EmbreeIntersectorSingleStreamAos(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
+
+    void intersect(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += count;
+
+        for (int i = 0; i < count; ++i)
+            rtcIntersect1Ex(scene, &context, rays[i]);
+    }
+
+    void occluded(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += count;
+
+        for (int i = 0; i < count; ++i)
+            rtcOccluded1Ex(scene, &context, rays[i]);
+    }
+};
+
+} // namespace prt

@@ -39,6 +39,16 @@ protected:
 public:
     EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& props, Props& stats);
     virtual ~EmbreeIntersector();
+
+protected:
+    FORCEINLINE void initIntersectContext(RTCIntersectContext& context, RayHint hint)
+    {
+        if (hint == rayHintCoherent)
+            context.flags = RTC_INTERSECT_COHERENT;
+        else
+            context.flags = RTC_INTERSECT_INCOHERENT;
+        context.userRayExt = 0;
+    }
 };
 
 } // namespace prt

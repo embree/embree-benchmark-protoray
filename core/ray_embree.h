@@ -16,18 +16,41 @@
 
 #pragma once
 
-#include "intersector.h"
-#include "ray.h"
+#ifdef EMBREE_SUPPORT
 
-namespace prt {
+#include <embree2/rtcore_ray.h>
 
-class IntersectorSingle
+#else
+
+#include "sys/memory.h"
+
+#define RTC_INVALID_GEOMETRY_ID ((unsigned int)-1)
+
+struct ALIGNED(16) RTCRay
 {
-public:
-    virtual ~IntersectorSingle() {}
+    // Ray data
+    float org[3];        // origin
+    float align0;
 
-    virtual void intersect(Ray& ray, Hit& hit, RayStats& stats, RayHint hint = rayHintDefault) = 0;
-    virtual void occluded(Ray& ray, RayStats& stats, RayHint hint = rayHintDefault) = 0;
+    float dir[3];        // direction
+    float align1;
+
+    float tnear;         // start of ray segment
+    float tfar;          // end of ray segment (set to hit distance)
+
+    float time;          // time (used for motion blur)
+    unsigned int mask;   // used to mask out objects
+
+    // Hit data
+    float Ng[3];         // unnormalized geometry normal
+    float align2;
+
+    float u;             // barycentric u coordinate
+    float v;             // barycentric v coordinate
+
+    unsigned int geomID; // geometry ID
+    unsigned int primID; // primitive ID
+    unsigned int instID; // instance ID
 };
 
-} // namespace prt
+#endif

@@ -89,8 +89,8 @@ struct RaySimd
 struct HitSimd
 {
     vint primId; // primitive ID
-    vfloat u;    // u coord
-    vfloat v;    // v coord
+    vfloat u;    // barycentric u coordinate
+    vfloat v;    // barycentric v coordinate
 
     FORCEINLINE int*   getPrimId() { return &primId[0]; }
     FORCEINLINE float* getU()      { return &u[0]; }
