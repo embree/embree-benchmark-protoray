@@ -1,0 +1,15 @@
+Mazda:
+http://www.evermotion.org/shop/show_product/scene-10-archexteriors-vol-15/7997
+
+Villa:
+http://www.evermotion.org/shop/show_product/scene-09-archexteriors-vol-25/11876
+
+Art Deco:
+http://www.evermotion.org/shop/show_product/scene-09-archinteriors-vol-32/11010
+
+Power Plant:
+http://casual-effects.com/data/index.html
+http://g3d.cs.williams.edu/g3d/data10/research/model/powerplant/powerplant.zip
+
+San Miguel:
+https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/understanding-the-efficiency-of-ray-traversal-on-gpus/gpu-ray-traversal-1.4.zip

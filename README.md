@@ -29,3 +29,9 @@ Render with packet diffuse path tracing:
 Render with stream diffuse path tracing:
 
     ./protoray render scene.mesh -no-mtl -r diffuseStream -streamSize 256 -size 1920,1080
+
+
+Running benchmarks
+==================
+
+See the 'benchmark' directory for benchmark scripts, links to scenes, and scene view files.
