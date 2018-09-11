@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -152,6 +152,12 @@ template <class T>
 FORCEINLINE ToIntT<Vec4<T>> asInt(const Vec4<T>& a)
 {
     return ToIntT<Vec4<T>>(asInt(a.x), asInt(a.y), asInt(a.z), asInt(a.w));
+}
+
+template <class T, int N>
+FORCEINLINE Vec4<T> toScalar(const Vec4v<T,N>& a)
+{
+    return Vec4<T>(toScalar(a.x), toScalar(a.y), toScalar(a.z), toScalar(a.w));
 }
 
 // Selection functions
@@ -368,6 +374,18 @@ template <class T>
 FORCEINLINE T length(const Vec4<T>& a)
 {
     return sqrt(dot(a, a));
+}
+
+template <class T>
+FORCEINLINE T lengthRcp(const Vec4<T>& a)
+{
+    return rsqrt(dot(a, a));
+}
+
+template <class T>
+FORCEINLINE T lengthRcpSafe(const Vec4<T>& a)
+{
+    return rsqrtSafe(dot(a, a));
 }
 
 template <class T>

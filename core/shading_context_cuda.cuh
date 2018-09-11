@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -23,22 +23,20 @@ namespace prt {
 struct ShadingContextCuda
 {
     float3 p;        // position
-    float3 U;        // shading tangent
-    float3 V;        // shading bitangent
-    float3 N;        // shading normal
+    Basis3f f;       // shading frame
     float3 Ng;       // geometric normal
     float2 uv;       // texture coords
     bool backfacing; // is the geometry backfacing?
     float eps;       // intersection epsilon
 
-    CUDA_DEV_FORCEINLINE Basis3f getBasis() const
+    CUDA_DEV_FORCEINLINE const Basis3f& getFrame() const
     {
-        return Basis3f(U, V, N);
+        return f;
     }
 
     CUDA_DEV_FORCEINLINE float3 getN() const
     {
-        return N;
+        return f.N;
     }
 };
 
@@ -48,9 +46,9 @@ struct SimpleShadingContextCuda
     float3 Ng;       // geometric normal
     float eps;       // intersection epsilon
 
-    CUDA_DEV_FORCEINLINE Basis3f getBasis() const
+    CUDA_DEV_FORCEINLINE Basis3f getFrame() const
     {
-        return makeBasis(Ng);
+        return makeFrame(Ng);
     }
 
     CUDA_DEV_FORCEINLINE float3 getN() const

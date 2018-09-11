@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -76,7 +76,7 @@ FORCEINLINE Vec3<T> cosineSampleHemisphere(const Vec2<T>& s)
 template <class T>
 FORCEINLINE T cosineSampleHemispherePdf(T cosTheta)
 {
-    return max(cosTheta * (1.0f/float(pi)), 0.0f);
+    return cosTheta * (1.0f/float(pi));
 }
 
 template <class T>

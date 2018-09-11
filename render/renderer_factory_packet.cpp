@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -21,6 +21,7 @@
 #include "po_integrator_packet.h"
 #include "ao_integrator_packet.h"
 #include "diffuse_integrator_packet.h"
+#include "diffuse2_integrator_packet.h"
 #include "renderer_factory_packet.h"
 
 namespace prt {
@@ -47,11 +48,17 @@ ref<Renderer> RendererFactoryPacket::makeWithSampler(const std::string& type, co
     if (type == "poPacket")
         return makeRef<RendererPacket<PoIntegratorPacket<Sampler>, Sampler>>(scene, intersector, props);
     if (type == "aoPacket")
-        return makeRef<RendererPacket<AoIntegratorPacket<Sampler>, Sampler>>(scene, intersector, props);
+        return makeRef<RendererPacket<AoIntegratorPacket<ShadingContextSimd, Sampler>, Sampler>>(scene, intersector, props);
+    if (type == "aoPacketFast")
+        return makeRef<RendererPacket<AoIntegratorPacket<SimpleShadingContextSimd, Sampler>, Sampler, false>>(scene, intersector, props);
     if (type == "diffusePacket")
         return makeRef<RendererPacket<DiffuseIntegratorPacket<ShadingContextSimd, Sampler>, Sampler>>(scene, intersector, props);
     if (type == "diffusePacketFast")
         return makeRef<RendererPacket<DiffuseIntegratorPacket<SimpleShadingContextSimd, Sampler>, Sampler, false>>(scene, intersector, props);
+    if (type == "diffuse2Packet")
+        return makeRef<RendererPacket<Diffuse2IntegratorPacket<ShadingContextSimd, Sampler>, Sampler>>(scene, intersector, props);
+    if (type == "diffuse2PacketFast")
+        return makeRef<RendererPacket<Diffuse2IntegratorPacket<SimpleShadingContextSimd, Sampler>, Sampler, false>>(scene, intersector, props);
 
     throw std::invalid_argument("invalid renderer type");
 }

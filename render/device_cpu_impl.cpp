@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,14 +16,18 @@
 
 #include "camera/pinhole_camera.h"
 #include "camera/thin_lens_camera.h"
-#include "image/linear_tone_mapper.h"
-#include "image/reinhard_tone_mapper.h"
 #include "renderer_factory_single.h"
 #include "renderer_factory_packet.h"
 #include "renderer_factory_stream.h"
+#include "renderer_factory_stream_aos.h"
 #include "device_cpu_impl.h"
 
 namespace prt {
+
+DeviceCpuImpl::DeviceCpuImpl()
+    : rng(generateRandomSeed())
+{
+}
 
 DeviceCpuImpl* DeviceCpuImpl::create()
 {
@@ -50,7 +54,9 @@ Props DeviceCpuImpl::initRenderer(DeviceCpuImpl* impl, const Props& props, const
     Props newStats = stats;
     std::string type = props.get("type");
 
-    if (type.find("Stream") != std::string::npos || type.find("Ms") != std::string::npos)
+    if (type.find("StreamAos") != std::string::npos)
+        impl->renderer = RendererFactoryStreamAos::make(type, impl->scene, props, newStats);
+    else if (type.find("Stream") != std::string::npos || type.find("Ms") != std::string::npos)
         impl->renderer = RendererFactoryStream::make(type, impl->scene, props, newStats);
     else if (type.find("Packet") != std::string::npos)
         impl->renderer = RendererFactoryPacket::make(type, impl->scene, props, newStats);
@@ -65,6 +71,11 @@ Props DeviceCpuImpl::render(DeviceCpuImpl* impl, const Props& stats)
     Props newStats = stats;
     impl->renderer->render(impl->camera.get(), impl->frameBuffer.get(), newStats);
     return newStats;
+}
+
+Props DeviceCpuImpl::queryRay(DeviceCpuImpl* impl, const Ray& ray)
+{
+    return impl->renderer->queryRay(ray);
 }
 
 Props DeviceCpuImpl::queryPixel(DeviceCpuImpl* impl, int x, int y)
@@ -85,9 +96,10 @@ void DeviceCpuImpl::initCamera(DeviceCpuImpl* impl, const Props& props)
         throw std::invalid_argument("invalid camera type");
 }
 
-void DeviceCpuImpl::initFrame(DeviceCpuImpl* impl, const Vec2i& size)
+void DeviceCpuImpl::initFrame(DeviceCpuImpl* impl, const Vec2i& size, const Props& props)
 {
-    impl->frameBuffer = makeRef<FrameBuffer>(size);
+    int accumFlags = 0;
+    impl->frameBuffer = makeRef<FrameBuffer>(size, accumFlags);
 }
 
 void DeviceCpuImpl::initToneMapper(DeviceCpuImpl* impl, const Props& props)
@@ -97,11 +109,7 @@ void DeviceCpuImpl::initToneMapper(DeviceCpuImpl* impl, const Props& props)
     ref<ToneMapper> toneMapper;
     std::string type = props.get<std::string>("type");
 
-    if (type == "linear")
-        toneMapper = makeRef<LinearToneMapper>(props);
-    else if (type == "reinhard")
-        toneMapper = makeRef<ReinhardToneMapper>(props);
-    else if (type != "none")
+    if (type != "none")
         throw std::invalid_argument("invalid tone mapper type");
 
     impl->frameBuffer->setToneMapper(toneMapper);
@@ -112,14 +120,9 @@ void DeviceCpuImpl::clearFrame(DeviceCpuImpl* impl)
     impl->frameBuffer->clear();
 }
 
-void DeviceCpuImpl::updateFrame(DeviceCpuImpl* impl, Surface surface)
+void DeviceCpuImpl::blitFrame(DeviceCpuImpl* impl, Surface dest)
 {
-    impl->frameBuffer->update(surface);
-}
-
-void DeviceCpuImpl::readFrameHdr(DeviceCpuImpl* impl, Vec3f* dest)
-{
-    impl->frameBuffer->readHdr(dest);
+    impl->frameBuffer->blitLdr(dest);
 }
 
 } // namespace prt

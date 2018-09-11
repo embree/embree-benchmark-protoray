@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -27,12 +27,12 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
     int buildCount = props.get("buildCount", isBenchmark ? 12 : 1);
     int buildWarmup = props.get("buildWarmup", buildCount / 6);
 
-    std::string deviceCfg = props.get("embree", "");
+    std::string deviceCfg = props.get("embree", "start_threads=1,set_affinity=1");
     deviceCfg = props.get("rtcore", deviceCfg);
 
     if (buildCount > 1)
     {
-        std::string deviceCfg2 = "start_threads=1,tri_accel=bvh8.triangle4,tri_builder=";
+        std::string deviceCfg2 = "tri_accel=bvh8.triangle4,tri_builder=";
         if (isHighQuality)
             deviceCfg2 += "sah_fast_spatial";
         else
@@ -49,18 +49,12 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
     device = rtcNewDevice(deviceCfg.c_str());
 
     // Create scene
-    RTCSceneFlags sceneFlags = (buildCount == 1 ? RTC_SCENE_STATIC : RTC_SCENE_DYNAMIC) | RTC_SCENE_INCOHERENT;
+    RTCSceneFlags sceneFlags = (buildCount == 1 ? RTC_SCENE_FLAG_NONE : RTC_SCENE_FLAG_DYNAMIC);
+
+    scene = rtcNewScene(device);
+    rtcSetSceneFlags(scene, sceneFlags);
     if (isHighQuality)
-        sceneFlags = sceneFlags | RTC_SCENE_HIGH_QUALITY;
-
-    RTCAlgorithmFlags algoFlags = RTC_INTERSECT1 | RTC_INTERSECT_STREAM;
-#if defined(__AVX512F__) || defined(__MIC__)
-    algoFlags = algoFlags | RTC_INTERSECT16;
-#else
-    algoFlags = algoFlags | RTC_INTERSECT8;
-#endif
-
-    scene = rtcDeviceNewScene(device, sceneFlags, algoFlags);
+        rtcSetSceneBuildQuality(scene, RTC_BUILD_QUALITY_HIGH);
 
     // Build
     if (buildCount == 1)
@@ -68,17 +62,14 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
     else
         Log() << "Building acceleration structure (" << buildCount << "x)";
 
-    geomID = rtcNewTriangleMesh(scene, RTC_GEOMETRY_STATIC, mesh->indices.getSize(), mesh->vertexCount, 1);
+    geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+    rtcAttachGeometry(scene, geom);
 
-    Vec3i* triangles = (Vec3i*)rtcMapBuffer(scene, geomID, RTC_INDEX_BUFFER);
-    for (int i = 0; i < mesh->indices.getSize(); ++i)
-        triangles[i] = mesh->indices[i];
-    rtcUnmapBuffer(scene, geomID, RTC_INDEX_BUFFER);
+    rtcSetSharedGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, mesh->indices.getData(), 0, sizeof(Vec3i), mesh->indices.getSize());
 
-    Vec4f* vertices = (Vec4f*)rtcMapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
+    Vec3f* vertices = (Vec3f*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vec3f), mesh->vertexCount);
     for (int i = 0; i < mesh->vertexCount; ++i)
-        vertices[i] = Vec4f(mesh->getPosition(i), 0.0f);
-    rtcUnmapBuffer(scene, geomID, RTC_VERTEX_BUFFER);
+        vertices[i] = mesh->getPosition(i);
 
     Timer timer;
     double buildTimeSum = 0.0;
@@ -86,8 +77,8 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
     for (int buildIndex = 0; buildIndex < buildCount; ++buildIndex)
     {
         timer.reset();
-        rtcUpdate(scene, geomID);
-        rtcCommit(scene);
+        rtcCommitGeometry(geom);
+        rtcCommitScene(scene);
         double buildTime = timer.query();
         if (buildCount == 1 || buildIndex >= buildWarmup)
             buildTimeSum += buildTime;
@@ -107,8 +98,9 @@ EmbreeIntersector::EmbreeIntersector(ref<const TriangleMesh> mesh, const Props& 
 
 EmbreeIntersector::~EmbreeIntersector()
 {
-    rtcDeleteScene(scene);
-    rtcDeleteDevice(device);
+    rtcReleaseGeometry(geom);
+    rtcReleaseScene(scene);
+    rtcReleaseDevice(device);
 }
 
 } // namespace prt

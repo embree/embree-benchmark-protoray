@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -89,20 +89,20 @@ void TriangleMesh::postIntersect(const Ray& ray, const Hit& hit, ShadingContext&
         Vec3f n1 = getNormal(tri[1]);
         Vec3f n2 = getNormal(tri[2]);
 
-        ctx.N = normalize(b0*n0 + b1*n1 + b2*n2);
-        if (dot(ctx.N, ctx.Ng) < 0.0f)
-            ctx.N = -ctx.N;
+        ctx.f.N = normalize(b0*n0 + b1*n1 + b2*n2);
+        if (dot(ctx.f.N, ctx.Ng) < 0.0f)
+            ctx.f.N = -ctx.f.N;
     }
     else
     {
-        ctx.N = ctx.Ng;
+        ctx.f.N = ctx.Ng;
     }
 
     ctx.backfacing = dot(ctx.Ng, ray.dir) > 0.0f;
     if (ctx.backfacing)
     {
         ctx.Ng = -ctx.Ng;
-        ctx.N = -ctx.N;
+        ctx.f.N = -ctx.f.N;
     }
 
     // Compute the UVs
@@ -127,28 +127,28 @@ void TriangleMesh::postIntersect(const Ray& ray, const Hit& hit, ShadingContext&
             Vec3f dpdu = (dv2 * dp1 - dv1 * dp2) * invDet;
             //Vec3f dpdv = (du1 * dp2 - du2 * dp1) * invDet;
 
-            // Compute basis
-            ctx.U = normalize(dpdu);
-            ctx.V = cross(ctx.N, ctx.U);
-            if (LIKELY(lengthSqr(ctx.V) > 0.0f))
+            // Compute frame
+            ctx.f.U = normalize(dpdu);
+            ctx.f.V = cross(ctx.f.N, ctx.f.U);
+            if (LIKELY(lengthSqr(ctx.f.V) > 0.0f))
             {
-                ctx.V = normalize(ctx.V);
-                ctx.U = cross(ctx.V, ctx.N);
+                ctx.f.V = normalize(ctx.f.V);
+                ctx.f.U = cross(ctx.f.V, ctx.f.N);
             }
             else
             {
-                makeBasis(ctx.U, ctx.V, ctx.N);
+                makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
             }
         }
         else
         {
-            makeBasis(ctx.U, ctx.V, ctx.N);
+            makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
         }
     }
     else
     {
         ctx.uv = Vec2f(hit.u, hit.v);
-        makeBasis(ctx.U, ctx.V, ctx.N);
+        makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
     }
 }
 
@@ -189,17 +189,17 @@ void TriangleMesh::postIntersect(vbool m, const RaySimd& ray, const HitSimd& hit
         Vec3vf n1 = getNormal(m, tri[1]);
         Vec3vf n2 = getNormal(m, tri[2]);
 
-        ctx.N = normalize(b0*n0 + b1*n1 + b2*n2);
-        set(dot(ctx.N, ctx.Ng) < 0.0f, ctx.N, -ctx.N);
+        ctx.f.N = normalize(b0*n0 + b1*n1 + b2*n2);
+        set(dot(ctx.f.N, ctx.Ng) < 0.0f, ctx.f.N, -ctx.f.N);
     }
     else
     {
-        ctx.N = ctx.Ng;
+        ctx.f.N = ctx.Ng;
     }
 
     ctx.backfacing = dot(ctx.Ng, ray.dir) > 0.0f;
     set(ctx.backfacing, ctx.Ng, -ctx.Ng);
-    set(ctx.backfacing, ctx.N, -ctx.N);
+    set(ctx.backfacing, ctx.f.N, -ctx.f.N);
 
     if (texcoords)
     {
@@ -222,26 +222,26 @@ void TriangleMesh::postIntersect(vbool m, const RaySimd& ray, const HitSimd& hit
         Vec3vf dpdu = (dv2 * dp1 - dv1 * dp2) * invDet;
         //Vec3vf dpdv = (du1 * dp2 - du2 * dp1) * invDet;
 
-        // Compute basis
-        ctx.U = normalize(dpdu);
-        ctx.V = cross(ctx.N, ctx.U);
-        isDetZero |= lengthSqr(ctx.V) == 0.0f;
-        ctx.V = normalize(ctx.V);
-        ctx.U = cross(ctx.V, ctx.N);
+        // Compute frame
+        ctx.f.U = normalize(dpdu);
+        ctx.f.V = cross(ctx.f.N, ctx.f.U);
+        isDetZero |= lengthSqr(ctx.f.V) == 0.0f;
+        ctx.f.V = normalize(ctx.f.V);
+        ctx.f.U = cross(ctx.f.V, ctx.f.N);
 
         isDetZero &= m;
         if (any(isDetZero))
         {
             Vec3vf U2, V2;
-            makeBasis(U2, V2, ctx.N);
-            set(isDetZero, ctx.U, U2);
-            set(isDetZero, ctx.V, V2);
+            makeFrame(U2, V2, ctx.f.N);
+            set(isDetZero, ctx.f.U, U2);
+            set(isDetZero, ctx.f.V, V2);
         }
     }
     else
     {
         ctx.uv = Vec2vf(hit.u, hit.v);
-        makeBasis(ctx.U, ctx.V, ctx.N);
+        makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
     }
 }
 

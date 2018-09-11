@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -54,8 +54,10 @@ public:
                 return makeRef<EmbreeIntersectorSingleStream<streamSize>>(scene->shape, props, stats);
             if (isectType == "packet")
                 return makeRef<EmbreeIntersectorPacketStream<streamSize>>(scene->shape, props, stats);
-            if (isectType == "stream")
+            if (isectType == "stream" || isectType == "streamSop")
                 return makeRef<EmbreeIntersectorStream<streamSize>>(scene->shape, props, stats);
+            if (isectType == "streamSoa")
+                return makeRef<EmbreeIntersectorStreamSoa<streamSize>>(scene->shape, props, stats);
 
             throw std::invalid_argument("invalid intersector type");
         }

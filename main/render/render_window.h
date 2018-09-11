@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -20,6 +20,7 @@
 #include "sys/array.h"
 #include "sys/props.h"
 #include "sys/timer.h"
+#include "image/image.h"
 #include "render/device.h"
 #include "window.h"
 #include "view.h"
@@ -39,6 +40,9 @@ private:
 
     ref<Device> device;
 
+    Image3f colorBuffer;
+    Vec2i imageSize;
+
     View view;
     View prevView;
     View copiedView;
@@ -57,16 +61,21 @@ private:
     bool isCameraRotateMode;
     ViewSet viewSet;
     std::string viewFilename;
+    Basis3f cameraBasis;
+    Array<Poi> poiSet;
+    std::string poiFilename;
+    bool isPoiMode;
 
     Tone tone;
     Tone prevTone;
-    Array<std::string> toneMappers;
+    Array<std::string> toneMapperNames;
 
     Timer timer;
     double runTimeThreshold;  // sec
     Timer statsTimer;
     Timer autoShotTimer;
     double autoShotThreshold; // sec
+    bool checkpoint;
     int frameCount;
     int spp;
     int maxSpp;
@@ -79,11 +88,15 @@ private:
     bool isBenchmarkMode;
     int warmupSpp;
     std::string resultPrefix;
+    std::string resultId;
     StatsRecorder statsRecorder;
     std::string deviceInfo;
     bool isDemoMode;
     bool printCamera;
     Props buildStats;
+
+    Props props;
+    bool isSceneChanged;
 
 public:
     RenderWindow(int width, int height, DisplayMode mode, const ref<Device>& device, const Props& props, const Props& buildStats);
@@ -92,6 +105,10 @@ private:
     void onInit();
     void onDestroy();
     void onRender();
+
+    Props makeCamera();
+
+    void updateSurface(Surface& surface);
 
     void resetView();
     void setActiveView(int id);

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -14,17 +14,12 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
-#include "sampling/random_sampler.h"
 #include "sampling/random_sampler_simd.h"
 #include "intersector_factory_stream.h"
-#include "intersector_factory_stream_aos.h"
-#include "intersector_factory_single.h"
-#include "intersector_factory_packet.h"
 #include "primary_renderer_stream.h"
 #include "diffuse_renderer_stream.h"
-#include "diffuse_renderer_stream_aos.h"
-#include "renderer_single.h"
-#include "renderer_packet.h"
+#include "diffuse2_renderer_stream.h"
+#include "ao_renderer_stream.h"
 #include "renderer_factory_stream.h"
 
 namespace prt {
@@ -44,14 +39,13 @@ ref<Renderer> RendererFactoryStream::makeWithSampler(const std::string& type, co
 {
     int streamSize = props.get("streamSize", defaultRayStreamSize);
 
+#if 1
+    static_assert(defaultRayStreamSize == 2048 || defaultRayStreamSize == 4096, "invalid defaultRayStreamSize");
     if (streamSize == 256)
         return makeWithSamplerStream<Sampler, 256, 16>(type, scene, props, stats);
-    if (streamSize == 2048)
-        return makeWithSamplerStream<Sampler, 2048, 64>(type, scene, props, stats);
-    if (streamSize == 4096)
-        return makeWithSamplerStream<Sampler, 4096, 64>(type, scene, props, stats);
-
-#if 0
+    if (streamSize == defaultRayStreamSize)
+        return makeWithSamplerStream<Sampler, defaultRayStreamSize, 64>(type, scene, props, stats);
+#else
 #if SIMD_REG_SIZE == 32
     if (streamSize == 8)
         return makeWithSamplerStream<Sampler, 8, 8>(type, scene, props, stats);
@@ -64,13 +58,16 @@ ref<Renderer> RendererFactoryStream::makeWithSampler(const std::string& type, co
         return makeWithSamplerStream<Sampler, 64, 8>(type, scene, props, stats);
     if (streamSize == 128)
         return makeWithSamplerStream<Sampler, 128, 16>(type, scene, props, stats);
-#endif
-
-#if 0
+    if (streamSize == 256)
+        return makeWithSamplerStream<Sampler, 256, 16>(type, scene, props, stats);
     if (streamSize == 512)
         return makeWithSamplerStream<Sampler, 512, 32>(type, scene, props, stats);
     if (streamSize == 1024)
         return makeWithSamplerStream<Sampler, 1024, 32>(type, scene, props, stats);
+    if (streamSize == 2048)
+        return makeWithSamplerStream<Sampler, 2048, 64>(type, scene, props, stats);
+    if (streamSize == 4096)
+        return makeWithSamplerStream<Sampler, 4096, 64>(type, scene, props, stats);
     if (streamSize == 8192)
         return makeWithSamplerStream<Sampler, 8192, 128>(type, scene, props, stats);
     if (streamSize == 16384)
@@ -90,33 +87,27 @@ ref<Renderer> RendererFactoryStream::makeWithSamplerStream(const std::string& ty
     static const int streamTileY = (streamSize > 64) ? (streamSize / streamTileX) : (64 / streamTileX);
     static const int streamMsSpp = (streamSize > rayStreamMsTileX * rayStreamMsTileY) ? (streamSize / (rayStreamMsTileX * rayStreamMsTileY)) : 1;
 
-    // Stream
-    Log() << "Stream size: " << streamSize;
+    // Stream SOP
+    Log() << "SOP stream size: " << streamSize;
 
-    if (type.find("Aos") != std::string::npos)
-    {
-        // Stream AOS
-        ref<IntersectorStreamAos<streamSize>> intersector = IntersectorFactoryStreamAos::make<streamSize>(scene, props, stats);
+    ref<IntersectorStream<streamSize>> intersector = IntersectorFactoryStream::make<streamSize>(scene, props, stats);
 
-        if (type == "diffuseStreamAos")
-            return makeRef<DiffuseRendererStreamAos<ShadingContext, SamplerScalar, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
-        if (type == "diffuseStreamAosFast")
-            return makeRef<DiffuseRendererStreamAos<SimpleShadingContext, SamplerScalar, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
-    }
-    else
-    {
-        // Stream SOP
-        ref<IntersectorStream<streamSize>> intersector = IntersectorFactoryStream::make<streamSize>(scene, props, stats);
-
-        if (type == "primaryStream")
-            return makeRef<PrimaryRendererStream<ShadingContextSimd, Sampler, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
-        if (type == "primaryStreamFast")
-            return makeRef<PrimaryRendererStream<SimpleShadingContextSimd, Sampler, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
-        if (type == "diffuseStream")
-            return makeRef<DiffuseRendererStream<ShadingContextSimd, Sampler, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
-        if (type == "diffuseStreamFast")
-            return makeRef<DiffuseRendererStream<SimpleShadingContextSimd, Sampler, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
-    }
+    if (type == "primaryStream")
+        return makeRef<PrimaryRendererStream<ShadingContextSimd, Sampler, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "primaryStreamFast")
+        return makeRef<PrimaryRendererStream<SimpleShadingContextSimd, Sampler, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "diffuseStream")
+        return makeRef<DiffuseRendererStream<ShadingContextSimd, Sampler, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "diffuseStreamFast")
+        return makeRef<DiffuseRendererStream<SimpleShadingContextSimd, Sampler, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "diffuse2Stream")
+        return makeRef<Diffuse2RendererStream<ShadingContextSimd, Sampler, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "diffuse2StreamFast")
+        return makeRef<Diffuse2RendererStream<SimpleShadingContextSimd, Sampler, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "aoStream")
+        return makeRef<AoRendererStream<ShadingContextSimd, Sampler, true, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
+    if (type == "aoStreamFast")
+        return makeRef<AoRendererStream<SimpleShadingContextSimd, Sampler, false, streamSize, streamTileX, streamTileY>>(scene, intersector, props);
 
     throw std::invalid_argument("invalid renderer type");
 }

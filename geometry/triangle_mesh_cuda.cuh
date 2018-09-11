@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -66,20 +66,20 @@ CUDA_DEV_FORCEINLINE void postIntersect(const TriangleMeshCuda& mesh, const RayC
         float3 n1 = getNormal(mesh, tri.y);
         float3 n2 = getNormal(mesh, tri.z);
 
-        ctx.N = normalize(b0*n0 + b1*n1 + b2*n2);
-        if (dot(ctx.N, ctx.Ng) < 0.0f)
-            ctx.N = -ctx.N;
+        ctx.f.N = normalize(b0*n0 + b1*n1 + b2*n2);
+        if (dot(ctx.f.N, ctx.Ng) < 0.0f)
+            ctx.f.N = -ctx.f.N;
     }
     else
     {
-        ctx.N = ctx.Ng;
+        ctx.f.N = ctx.Ng;
     }
 
     ctx.backfacing = dot(ctx.Ng, ray.dir) > 0.0f;
     if (ctx.backfacing)
     {
         ctx.Ng = -ctx.Ng;
-        ctx.N = -ctx.N;
+        ctx.f.N = -ctx.f.N;
     }
 
     // Compute the UVs
@@ -104,28 +104,28 @@ CUDA_DEV_FORCEINLINE void postIntersect(const TriangleMeshCuda& mesh, const RayC
             float3 dpdu = (dv2 * dp1 - dv1 * dp2) * invDet;
             //float3 dpdv = (du1 * dp2 - du2 * dp1) * invDet;
 
-            // Compute basis
-            ctx.U = normalize(dpdu);
-            ctx.V = cross(ctx.N, ctx.U);
-            if (lengthSqr(ctx.V) > 0.0f)
+            // Compute frame
+            ctx.f.U = normalize(dpdu);
+            ctx.f.V = cross(ctx.f.N, ctx.f.U);
+            if (lengthSqr(ctx.f.V) > 0.0f)
             {
-                ctx.V = normalize(ctx.V);
-                ctx.U = cross(ctx.V, ctx.N);
+                ctx.f.V = normalize(ctx.f.V);
+                ctx.f.U = cross(ctx.f.V, ctx.f.N);
             }
             else
             {
-                makeBasis(ctx.U, ctx.V, ctx.N);
+                makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
             }
         }
         else
         {
-            makeBasis(ctx.U, ctx.V, ctx.N);
+            makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
         }
     }
     else
     {
         ctx.uv = make_float2(hit.u, hit.v);
-        makeBasis(ctx.U, ctx.V, ctx.N);
+        makeFrame(ctx.f.U, ctx.f.V, ctx.f.N);
     }
 }
 

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -29,6 +29,7 @@ OptixIntersectorStreamCuda::OptixIntersectorStreamCuda(const TriangleMeshCuda& m
 
     // Create context
     Log() << "Creating OptiX Prime context";
+    Log() << optix::prime::getVersionString();
     context = optix::prime::Context::create(RTP_CONTEXT_TYPE_CUDA);
 
     // Use only the first CUDA device
@@ -68,15 +69,23 @@ OptixIntersectorStreamCuda::OptixIntersectorStreamCuda(const TriangleMeshCuda& m
     Log() << "Build time: " << buildMsAvg << " ms";
     Log() << "Build speed: " << buildMprimAvg << " Mprim/s";
 
-    // Create query
-    query = model->createQuery(RTP_QUERY_TYPE_CLOSEST);
+    // Create queries
+    closestQuery = model->createQuery(RTP_QUERY_TYPE_CLOSEST);
+    anyQuery = model->createQuery(RTP_QUERY_TYPE_ANY);
 }
 
 void OptixIntersectorStreamCuda::intersect(RayCuda* rays, HitCuda* hits, int count)
 {
-    query->setRays(count, RTP_BUFFER_FORMAT_RAY_ORIGIN_TMIN_DIRECTION_TMAX, RTP_BUFFER_TYPE_CUDA_LINEAR, rays);
-    query->setHits(count, RTP_BUFFER_FORMAT_HIT_T_TRIID_U_V, RTP_BUFFER_TYPE_CUDA_LINEAR, hits);
-    query->execute(0);
+    closestQuery->setRays(count, RTP_BUFFER_FORMAT_RAY_ORIGIN_TMIN_DIRECTION_TMAX, RTP_BUFFER_TYPE_CUDA_LINEAR, rays);
+    closestQuery->setHits(count, RTP_BUFFER_FORMAT_HIT_T_TRIID_U_V, RTP_BUFFER_TYPE_CUDA_LINEAR, hits);
+    closestQuery->execute(0);
+}
+
+void OptixIntersectorStreamCuda::occluded(RayCuda* rays, AnyHitCuda* hits, int count)
+{
+    anyQuery->setRays(count, RTP_BUFFER_FORMAT_RAY_ORIGIN_TMIN_DIRECTION_TMAX, RTP_BUFFER_TYPE_CUDA_LINEAR, rays);
+    anyQuery->setHits(count, RTP_BUFFER_FORMAT_HIT_T, RTP_BUFFER_TYPE_CUDA_LINEAR, hits);
+    anyQuery->execute(0);
 }
 
 } // namespace prt

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -15,6 +15,7 @@
 // ======================================================================== //
 
 #include <fstream>
+#include <sys/stat.h>
 #include "math/random.h"
 #include "mutex.h"
 #include "lock_guard.h"
@@ -47,6 +48,12 @@ std::string convertFilename(const std::string& filename)
     std::string newFilename = filename;
     std::replace(newFilename.begin(), newFilename.end(), '\\', '/');
     return newFilename;
+}
+
+bool isDirectory(const std::string& filename)
+{
+    struct stat s;
+    return stat(filename.c_str(), &s) == 0 && S_ISDIR(s.st_mode);
 }
 
 // Temp files

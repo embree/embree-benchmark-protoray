@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -41,7 +41,7 @@ DisplayMode displayMode = displayModeOffscreen;
 Vec2i imageSize(1024, 576);
 int viewId = 0;
 bool isBenchmarkMode = false;
-std::string resultPrefix;
+std::string resultPrefix = "render";
 Props props;
 
 bool applyOptions(const Array<Option>& opts)
@@ -98,6 +98,10 @@ bool applyOptions(const Array<Option>& opts)
             if (resultPrefix.empty())
                 resultPrefix = "benchmark";
             props.set(opt.name, opt.value);
+        }
+        else if (opt.name == "o" || opt.name == "out" || opt.name == "output")
+        {
+            resultPrefix = opt.value;
         }
         else if (opt.name == "view")
         {
@@ -207,6 +211,7 @@ int mainRender(int argc, char* argv[])
         Log() << "Device: " << deviceInfo;
 
     device->initScene(sceneFilename, props);
+    device->initFrame(imageSize, props);
 
     Props rendererProps = props;
     rendererProps.set("type", rendererId);
@@ -214,14 +219,14 @@ int mainRender(int argc, char* argv[])
     Props buildStats;
     device->initRenderer(rendererProps, buildStats);
 
-    device->initFrame(imageSize);
-
 	// Create and start the UI
     props.set("viewFile", sceneBase + ".view");
     props.set("view", viewId);
+    props.set("poiFile", sceneBase + ".poi");
 
 	if (isBenchmarkMode)
         props.set("benchmark", resultPrefix);
+    props.set("output", resultPrefix);
 
     RenderWindow window(imageSize.x, imageSize.y, displayMode, device, props, buildStats);
     window.setTitle("ProtoRay");

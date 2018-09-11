@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -21,7 +21,7 @@
 
 namespace prt {
 
-template <class Sampler>
+template <class ShadingContextT, class Sampler>
 class AoIntegratorPacket : public IntegratorBase
 {
 private:
@@ -43,18 +43,18 @@ public:
     Vec3vf getColor(RaySimd& ray, IntersectorPacket* intersector, const Scene* scene, Sampler& sampler, IntegratorState<Sampler>& state)
     {
         HitSimd hit;
-        intersector->intersect(one, ray, hit, state.rayStats);
+        intersector->intersect(one, ray, hit, state.rayStats, rayHintCoherent);
         vbool active = ray.isHit();
         if (none(active)) return zero;
 
-        ShadingContextSimd ctx;
+        ShadingContextT ctx;
         scene->postIntersect(active, ray, hit, ctx);
 
         vfloat sum = zero;
         for (int i = 0; i < sampleCount; ++i)
         {
             Vec2vf s = sampler.get2D(state.sampler, sampleDimBaseSize + 2 * i);
-            ray.init(ctx.p, ctx.getBasis() * cosineSampleHemisphere(s), ctx.eps);
+            ray.init(ctx.p, ctx.getFrame() * cosineSampleHemisphere(s), ctx.eps);
 
             //intersector->intersect(active, ray, hit, state.rayStats);
             intersector->occluded(active, ray, state.rayStats);

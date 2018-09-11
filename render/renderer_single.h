@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -40,20 +40,19 @@ private:
     const Camera* camera;
     FrameBuffer* frameBuffer;
     Array<IntegratorState<Sampler>> states;
-    Vec2i imageSize;
     int pass;
     bool isStatic;
 
 public:
     RendererSingle(const ref<const Scene>& scene, const ref<IntersectorSingle>& intersector, const Props& props)
-        : integrator(props)
+        : Renderer(props),
+          integrator(props)
     {
         this->scene = scene;
         this->intersector = intersector;
-        imageSize = props.get<Vec2i>("imageSize");
 
         // Initialize the sampler
-        int sampleCount = 64*1024; // FIXME
+        int sampleCount = props.get("spp", 0);
         int pixelCount = imageSize.x * imageSize.y;
         sampler.init(integrator.getSampleSize(), sampleCount, pixelCount);
 
@@ -127,33 +126,20 @@ private:
                 //if (!all(isfinite(color))) LogWarn() << "Infinite radiance: " << color;
 
                 if (accum)
-                    frameBuffer->add(pixel, color);
+                    frameBuffer->getColor().add(pixel, color);
                 else
-                    frameBuffer->set(pixel, color);
+                    frameBuffer->getColor().set(pixel, color);
             }
         }
     }
 
 public:
-    Props queryPixel(const Camera* camera, int x, int y)
+    Props queryRay(const Ray& inputRay)
     {
         Props result;
 
-        CameraSample cameraSample;
-        cameraSample.lens = zero;
-
-        // Generate a ray through the center of the image plane
-        // We need this to compute the depth
-        Ray centerRay;
-        cameraSample.image = 0.5f;
-        camera->getRay(centerRay, cameraSample);
-
-        // Generate a ray through the pixel
-        Ray ray;
-        cameraSample.image = (Vec2f(x, y) + 0.5f) / toFloat(imageSize);
-        camera->getRay(ray, cameraSample);
-
         // Shoot the ray
+        Ray ray = inputRay;
         Hit hit;
         ShadingContext ctx;
         RayStats stats;
@@ -165,12 +151,13 @@ public:
         // Fill the query result
         result.set("mat", scene->getMaterialName(matId));
         result.set("matId", matId);
-        result.set("prim", hit.primId);
-        result.set("depth", ray.far * dot(ray.dir, centerRay.dir));
+        result.set("primId", hit.primId);
+        result.set("dist", ray.far);
         result.set("p", ray.getHitPoint());
         result.set("Ng", ctx.Ng);
-        result.set("N", ctx.N);
+        result.set("N", ctx.f.N);
         result.set("uv", ctx.uv);
+        result.set("eps", ctx.eps);
 
         return result;
     }

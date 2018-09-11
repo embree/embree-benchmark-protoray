@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,39 +18,51 @@
 
 #ifdef EMBREE_SUPPORT
 
-#include <embree2/rtcore_ray.h>
+#include <embree3/rtcore_ray.h>
 
 #else
 
 #include "sys/memory.h"
 
+#define RTC_MAX_INSTANCE_LEVEL_COUNT 1
 #define RTC_INVALID_GEOMETRY_ID ((unsigned int)-1)
 
 struct ALIGNED(16) RTCRay
 {
-    // Ray data
-    float org[3];        // origin
-    float align0;
+  float org_x;        // x coordinate of ray origin
+  float org_y;        // y coordinate of ray origin
+  float org_z;        // z coordinate of ray origin
+  float tnear;        // start of ray segment
 
-    float dir[3];        // direction
-    float align1;
+  float dir_x;        // x coordinate of ray direction
+  float dir_y;        // y coordinate of ray direction
+  float dir_z;        // z coordinate of ray direction
+  float time;         // time of this ray for motion blur
 
-    float tnear;         // start of ray segment
-    float tfar;          // end of ray segment (set to hit distance)
+  float tfar;         // end of ray segment (set to hit distance)
+  unsigned int mask;  // ray mask
+  unsigned int id;    // ray ID
+  unsigned int flags; // ray flags
+};
 
-    float time;          // time (used for motion blur)
-    unsigned int mask;   // used to mask out objects
+struct RTCHit
+{
+  float Ng_x;          // x coordinate of geometry normal
+  float Ng_y;          // y coordinate of geometry normal
+  float Ng_z;          // z coordinate of geometry normal
 
-    // Hit data
-    float Ng[3];         // unnormalized geometry normal
-    float align2;
+  float u;             // barycentric u coordinate of hit
+  float v;             // barycentric v coordinate of hit
 
-    float u;             // barycentric u coordinate
-    float v;             // barycentric v coordinate
+  unsigned int primID; // geometry ID
+  unsigned int geomID; // primitive ID
+  unsigned int instID[RTC_MAX_INSTANCE_LEVEL_COUNT]; // instance ID
+};
 
-    unsigned int geomID; // geometry ID
-    unsigned int primID; // primitive ID
-    unsigned int instID; // instance ID
+struct RTCRayHit
+{
+  struct RTCRay ray;
+  struct RTCHit hit;
 };
 
 #endif

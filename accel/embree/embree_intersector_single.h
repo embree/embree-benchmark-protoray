@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -33,14 +33,15 @@ public:
 
         stats.rayCount++;
 
-        RTCRay eray;
-        initRay(ray, eray);
-        rtcIntersect1Ex(scene, &context, eray);
+        RTCRayHit eray;
+        initRay(ray, eray.ray);
+        initHit(eray.hit);
+        rtcIntersect1(scene, &context, &eray);
 
-        ray.far = eray.tfar;
-        hit.primId = eray.primID;
-        hit.u = eray.u;
-        hit.v = eray.v;
+        ray.far = eray.ray.tfar;
+        hit.primId = eray.hit.primID;
+        hit.u = eray.hit.u;
+        hit.v = eray.hit.v;
     }
 
     void occluded(Ray& ray, RayStats& stats, RayHint hint)
@@ -52,32 +53,10 @@ public:
 
         RTCRay eray;
         initRay(ray, eray);
-        rtcOccluded1Ex(scene, &context, eray);
+        rtcOccluded1(scene, &context, &eray);
 
-        if (eray.geomID == 0)
-            ray.far = 0.0f;
-    }
-
-private:
-    FORCEINLINE void initRay(const Ray& ray, RTCRay& eray)
-    {
-        eray.org[0] = ray.org.x;
-        eray.org[1] = ray.org.y;
-        eray.org[2] = ray.org.z;
-
-        eray.dir[0] = ray.dir.x;
-        eray.dir[1] = ray.dir.y;
-        eray.dir[2] = ray.dir.z;
-
-        eray.tnear = 0.0f;
-        eray.tfar = ray.far;
-
-        eray.geomID = RTC_INVALID_GEOMETRY_ID;
-        eray.primID = RTC_INVALID_GEOMETRY_ID;
-        //eray.instID = RTC_INVALID_GEOMETRY_ID;
-
-        eray.mask = -1;
-        eray.time = 0.0f;
+        if (eray.tfar < 0.f)
+            ray.far = 0.f;
     }
 };
 

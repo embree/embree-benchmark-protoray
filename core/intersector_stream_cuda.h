@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -22,6 +22,7 @@ namespace prt {
 
 struct RayCuda;
 struct HitCuda;
+struct AnyHitCuda;
 
 class IntersectorStreamCuda
 {
@@ -29,6 +30,7 @@ public:
     virtual ~IntersectorStreamCuda() {}
 
     virtual void intersect(RayCuda* rays, HitCuda* hits, int count) = 0;
+    virtual void occluded(RayCuda* rays, AnyHitCuda* hits, int count) = 0;
 };
 
 } // namespace prt

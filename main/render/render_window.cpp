@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,8 +16,11 @@
 
 #include "sys/sysinfo.h"
 #include "sys/logging.h"
+#include "sys/filesystem.h"
+#include "sys/tasking.h"
 #include "math/math.h"
 #include "image/image.h"
+#include "image/pixel.h"
 #include "render_window.h"
 
 namespace prt {
@@ -29,10 +32,18 @@ RenderWindow::RenderWindow(int width, int height, DisplayMode mode, const ref<De
 
     resultPrefix = props.get("benchmark", "");
     isBenchmarkMode = !resultPrefix.empty();
+    if (props.exists("output"))
+        resultPrefix = props.get("output");
+    if (isDirectory(resultPrefix))
+        resultPrefix = resultPrefix + "/";
     runTimeThreshold = props.get("runtime", double(posInf));
     autoShotThreshold = props.get("autoshot", 0.0);
+    checkpoint = props.exists("checkpoint"); // save a screenshot at every power-of-two spp
     maxSpp = props.get("spp", 0);
     warmupSpp = props.get("warmup", maxSpp / 6);
+
+    // Setup buffers
+    imageSize = Vec2i(width, height);
 
     // Setup view
     viewFilename = props.get("viewFile", "default.view");
@@ -43,15 +54,19 @@ RenderWindow::RenderWindow(int width, int height, DisplayMode mode, const ref<De
     prevView.angleY = 0;
     prevView.fovY = -1.0f;
 
+    cameraBasis = one;
     printCamera = false;
 
+    poiFilename = props.get("poiFile", "default.poi");
+    isPoiMode = false;
+
     // Setup tone mapping
-    toneMappers.pushBack("none", "linear", "reinhard");
-    std::string toneMapper = props.get("tonemap", "none");
+    toneMapperNames.pushBack("none");
+    std::string toneMapperName = props.get("tonemap", "none");
     tone.typeId = 0;
-    for (int i = 0; i < toneMappers.getSize(); ++i)
+    for (int i = 0; i < toneMapperNames.getSize(); ++i)
     {
-        if (toneMappers[i] == toneMapper)
+        if (toneMapperNames[i] == toneMapperName)
         {
             tone.typeId = i;
             break;
@@ -73,6 +88,9 @@ RenderWindow::RenderWindow(int width, int height, DisplayMode mode, const ref<De
     deviceInfo = device->getInfo();
     isDemoMode = props.exists("demo");
     this->buildStats = buildStats;
+
+    this->props = props;
+    isSceneChanged = false;
 }
 
 void RenderWindow::onInit()
@@ -103,7 +121,10 @@ void RenderWindow::onInit()
     viewRadiusDelta = 0.0f;
 
     isMouseActive = false;
-    isCameraRotateMode = false;
+    isCameraRotateMode = true;
+
+    // Try to load the POI set
+    loadPoiSet(poiFilename, poiSet);
 
     // Init the frame stats
     frameCount = 0;
@@ -135,7 +156,7 @@ void RenderWindow::onDestroy()
     }
     else
     {
-        if (getDisplayMode() == displayModeOffscreen)
+        if ((getDisplayMode() == displayModeOffscreen) && !(checkpoint && isPowerOfTwo(spp)))
             saveAutoScreenshot();
     }
 }
@@ -143,7 +164,7 @@ void RenderWindow::onDestroy()
 void RenderWindow::onRender()
 {   
 	// Setup the camera
-    Basis3f cameraBasis = Basis3f(one).rotateV(view.angleY).rotateU(view.angleX);
+    cameraBasis = Basis3f(one).rotateV(view.angleY).rotateU(view.angleX);
     view.pos += cameraBasis.toGlobal(viewPosDelta * viewPosStep * viewPosSpeed);
     view.fovY = clamp(view.fovY + viewFovDelta * viewFovStep, viewFovStep, degToRad(100.0f));
     view.radius = max(view.radius + viewRadiusDelta * viewRadiusStep * viewPosSpeed, 0.0f);
@@ -153,22 +174,13 @@ void RenderWindow::onRender()
     bool updateCamera = memcmp(&view, &prevView, sizeof(View)) != 0;
     if (updateCamera || printCamera)
     {
-        Props camera;
-        if (view.radius == 0.0f)
-            camera.set("type", "pinhole");
-        else
-            camera.set("type", "thinlens");
-
-        camera.set("position", view.pos);
-        camera.set("basis", cameraBasis);
-        camera.set("fov", view.fovY);
-        camera.set("aspectRatio", (float)getWidth() / (float)getHeight());
-        camera.set("lensRadius", view.radius);
-        camera.set("focalDistance", view.focus);
+        Props camera = makeCamera();
 
         if (printCamera)
         {
-            Log() << "Camera: " << std::setprecision(6) << camera;
+            Vec3f lookAt = view.pos + cameraBasis.toGlobal(Vec3f(0.0f, 0.0f, -view.focus));
+            Vec3f up = cameraBasis.toGlobal(Vec3f(0.0f, 1.0f, 0.0f));
+            Log() << "Camera: " << std::setprecision(6) << camera << " lookAt=" << lookAt << " up=" << up;
             printCamera = false;
         }
 
@@ -180,27 +192,16 @@ void RenderWindow::onRender()
         }
     }
 
-    // Update tone mapping if necessary
-    if (memcmp(&tone, &prevTone, sizeof(Tone)) != 0)
-    {
-        Props toneMapper;
-        toneMapper.set("type", toneMappers[tone.typeId]);
-        toneMapper.set("exposure", exp2(tone.ev));
-        toneMapper.set("burn", tone.burn);
-
-        device->initToneMapper(toneMapper);
-        prevTone = tone;
-    }
-
     // Clear the frame if necessary
-    if (isCameraUpdated)
+    if (isCameraUpdated || isSceneChanged)
     {
         device->clearFrame();
         spp = 0;
+        isSceneChanged = false;
     }
 
     // Render the frame
-    bool isRendering = maxSpp == 0 || spp < maxSpp || isCameraUpdated;
+    bool isRendering = (maxSpp == 0) || (spp < maxSpp) || isCameraUpdated;
 
     if (!isRendering && (getDisplayMode() == displayModeOffscreen || isBenchmarkMode))
         quit();
@@ -222,8 +223,20 @@ void RenderWindow::onRender()
     if (isRendering)
         device->render(frameStats);
 
-    if (surface.data)
-        device->updateFrame(surface);
+    // Update tone mapping if necessary
+    if (memcmp(&tone, &prevTone, sizeof(Tone)) != 0)
+    {
+        Props toneMapperProps;
+        toneMapperProps.set("type", toneMapperNames[tone.typeId]);
+        toneMapperProps.set("exposure", exp2(tone.ev));
+        toneMapperProps.set("burn", tone.burn);
+
+        device->initToneMapper(toneMapperProps);
+        prevTone = tone;
+    }
+
+    // Update the frame
+    updateSurface(surface);
 
     if (isTextEnabled)
     {
@@ -263,6 +276,21 @@ void RenderWindow::onRender()
     }
 
     // Save a screenshot if necessary
+    if (checkpoint && isPowerOfTwo(spp))
+    {
+        std::stringstream sm;
+        if (!resultPrefix.empty())
+        {
+            sm << resultPrefix;
+            if (resultPrefix.back() != '/' && resultPrefix.back() != '\\')
+                sm << "_";
+        }
+        if (!resultId.empty())
+            sm << resultId << "_";
+        sm << std::setfill('0') << std::setw(6) << spp << "spp";
+        saveScreenshot(sm.str());
+    }
+
     if (autoShotThreshold > 0)
     {
         if (autoShotTimer.query() >= autoShotThreshold)
@@ -274,6 +302,34 @@ void RenderWindow::onRender()
 
     if (timer.query() >= runTimeThreshold)
         quit();
+}
+
+Props RenderWindow::makeCamera()
+{
+    Basis3f basis = Basis3f(one).rotateV(view.angleY).rotateU(view.angleX);
+
+    Props camera;
+    if (view.radius == 0.0f)
+        camera.set("type", "pinhole");
+    else
+        camera.set("type", "thinlens");
+
+    camera.set("position", view.pos);
+    camera.set("basis", basis);
+    camera.set("fov", view.fovY);
+    camera.set("aspectRatio", (float)getWidth() / (float)getHeight());
+    camera.set("lensRadius", view.radius);
+    camera.set("focalDistance", view.focus);
+
+    return camera;
+}
+
+void RenderWindow::updateSurface(Surface& surface)
+{
+    if (!surface.data)
+        return;
+
+    device->blitFrame(surface);
 }
 
 void RenderWindow::printFrameStats()
@@ -304,8 +360,6 @@ void RenderWindow::saveFullStats(const std::string& filename)
 
 void RenderWindow::saveScreenshot(const std::string& filename)
 {
-    Vec2i imageSize(getWidth(), getHeight());
-
     printFrameStats();
 
     // LDR
@@ -315,7 +369,7 @@ void RenderWindow::saveScreenshot(const std::string& filename)
     surface.height = imageSize.y;
     surface.pitch = imageSize.x * 4;
     surface.data = image.getData();
-    device->updateFrame(surface);
+    updateSurface(surface);
     saveImage(filename + ".ppm", image);
 }
 
@@ -398,6 +452,18 @@ void RenderWindow::queryPixel(int x, int y)
     // Refocus
     if (view.radius > 0.0f)
         view.focus = result.get("depth", view.focus);
+
+    if (isPoiMode)
+    {
+        // Add point to POIs
+        Poi poi;
+        poi.p = result.get<Vec3f>("p");
+        poi.N = normalize(result.get<Vec3f>("Ng"));
+        poi.dist = result.get<float>("dist");
+        poiSet.pushBack(poi);
+        Log() << "POI: p=" << poi.p << " N=" << poi.N << " dist=" << poi.dist;
+        savePoi(poiFilename, poi);
+    }
 }
 
 void RenderWindow::onKeyDown(int key)
@@ -445,6 +511,10 @@ void RenderWindow::onKeyDown(int key)
     case 'p':
         view.radius = 0.0f;
         Log() << "Pinhole lens";
+        break;
+
+    case 'z':
+        isCameraRotateMode = false;
         break;
 
 	case ' ':
@@ -495,32 +565,6 @@ void RenderWindow::onKeyDown(int key)
         printCamera = true;
         break;
 
-    // Tone mapping
-    case 't':
-        tone.typeId = (tone.typeId+1) % toneMappers.getSize();
-        Log() << "Tone mapping: " << toneMappers[tone.typeId];
-        break;
-
-    case '[':
-        tone.ev -= 0.1f;
-        Log() << "EV: " << tone.ev;
-        break;
-
-    case ']':
-        tone.ev += 0.1f;
-        Log() << "EV: " << tone.ev;
-        break;
-
-    case ',':
-        tone.burn = clamp(tone.burn - 0.02f, 0.0f, 1.0f);
-        Log() << "Burn: " << tone.burn;
-        break;
-
-    case '.':
-        tone.burn = clamp(tone.burn + 0.02f, 0.0f, 1.0f);
-        Log() << "Burn: " << tone.burn;
-        break;
-
     // Toggle refresh
     case 'r':
         setRefreshEnabled(!getRefreshEnabled());
@@ -561,6 +605,10 @@ void RenderWindow::onKeyUp(int key)
     case '=':
         viewRadiusDelta = 0.0f;
         break;
+
+    case 'z':
+        isCameraRotateMode = true;
+        break;
 	}
 }
 
@@ -570,11 +618,11 @@ void RenderWindow::onMouseButtonDown(int button, int x, int y)
 	{
     case mouseButtonLeft:
         isMouseActive = true;
-        isCameraRotateMode = true;
 		break;
 
     case mouseButtonRight:
         queryPixel(x, y);
+        break;
 
     case mouseButtonWheelUp:
         viewPosSpeed = min(viewPosSpeed*viewPosSpeedMul, 1e10f);

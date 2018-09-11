@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -35,79 +35,72 @@ public:
         for (int i = 0; i < count; i += simdSize)
             store(&geomIDs[i], vint(RTC_INVALID_GEOMETRY_ID));
 
-        RTCRayNp erays;
+        RTCRayHitNp erays;
 
-        erays.orgx = rays.getOrgX();
-        erays.orgy = rays.getOrgY();
-        erays.orgz = rays.getOrgZ();
+        erays.ray.org_x = rays.getOrgX();
+        erays.ray.org_y = rays.getOrgY();
+        erays.ray.org_z = rays.getOrgZ();
 
-        erays.dirx = rays.getDirX();
-        erays.diry = rays.getDirY();
-        erays.dirz = rays.getDirZ();
+        erays.ray.dir_x = rays.getDirX();
+        erays.ray.dir_y = rays.getDirY();
+        erays.ray.dir_z = rays.getDirZ();
 
-        erays.tnear = 0;
-        erays.tfar = rays.getFar();
+        erays.ray.tnear = 0;
+        erays.ray.tfar = rays.getFar();
 
-        erays.time = 0;
-        erays.mask = 0;
+        erays.ray.time = 0;
+        erays.ray.mask = 0;
+        erays.ray.id = 0;
+        erays.ray.flags = 0;
 
-        erays.Ngx = 0;
-        erays.Ngy = 0;
-        erays.Ngz = 0;
+        erays.hit.Ng_x = 0;
+        erays.hit.Ng_y = 0;
+        erays.hit.Ng_z = 0;
 
-        erays.u = hits.getU();
-        erays.v = hits.getV();
+        erays.hit.u = hits.getU();
+        erays.hit.v = hits.getV();
 
-        erays.geomID = (unsigned int*)geomIDs;
-        erays.primID = (unsigned int*)hits.getPrimId();
-        erays.instID = 0;
+        erays.hit.geomID = (unsigned int*)geomIDs;
+        erays.hit.primID = (unsigned int*)hits.getPrimId();
+        erays.hit.instID[0] = 0;
 
         RTCIntersectContext context;
         initIntersectContext(context, hint);
-        rtcIntersectNp(scene, &context, erays, count);
+        rtcIntersectNp(scene, &context, &erays, count);
     }
 
     void occluded(RayStream<streamSize>& rays, int count, RayStats& stats, RayHint hint)
     {
         stats.rayCount += count;
 
-        ALIGNED_CACHE int geomIDs[streamSize];
-        for (int i = 0; i < count; i += simdSize)
-            store(&geomIDs[i], vint(RTC_INVALID_GEOMETRY_ID));
-
         RTCRayNp erays;
 
-        erays.orgx = rays.getOrgX();
-        erays.orgy = rays.getOrgY();
-        erays.orgz = rays.getOrgZ();
+        erays.org_x = rays.getOrgX();
+        erays.org_y = rays.getOrgY();
+        erays.org_z = rays.getOrgZ();
 
-        erays.dirx = rays.getDirX();
-        erays.diry = rays.getDirY();
-        erays.dirz = rays.getDirZ();
+        erays.dir_x = rays.getDirX();
+        erays.dir_y = rays.getDirY();
+        erays.dir_z = rays.getDirZ();
 
         erays.tnear = 0;
         erays.tfar = rays.getFar();
 
         erays.time = 0;
         erays.mask = 0;
-
-        erays.Ngx = 0;
-        erays.Ngy = 0;
-        erays.Ngz = 0;
-
-        erays.u = 0;
-        erays.v = 0;
-
-        erays.geomID = (unsigned int*)geomIDs;
-        erays.primID = 0;
-        erays.instID = 0;
+        erays.id = 0;
+        erays.flags = 0;
 
         RTCIntersectContext context;
         initIntersectContext(context, hint);
-        rtcOccludedNp(scene, &context, erays, count);
+        rtcOccludedNp(scene, &context, &erays, count);
 
         for (int i = 0; i < count; i += simdSize)
-            store(load(&geomIDs[i]) == vint(zero), &rays.far[i], vfloat(zero));
+        {
+            vfloat far = rays.far.getA(i);
+            far = select(far < vfloat(zero), vfloat(zero), far);
+            rays.far.setA(i, far);
+        }
     }
 };
 
@@ -126,14 +119,15 @@ public:
 
         for (int i = 0; i < count; ++i)
         {
-            RTCRay eray;
-            initRay(rays, i, eray);
-            rtcIntersect1Ex(scene, &context, eray);
+            RTCRayHit eray;
+            initRay(rays, i, eray.ray);
+            initHit(eray.hit);
+            rtcIntersect1(scene, &context, &eray);
 
-            rays.far[i] = eray.tfar;
-            hits.primId[i] = eray.primID;
-            hits.u[i] = eray.u;
-            hits.v[i] = eray.v;
+            rays.far[i] = eray.ray.tfar;
+            hits.primId[i] = eray.hit.primID;
+            hits.u[i] = eray.hit.u;
+            hits.v[i] = eray.hit.v;
         }
     }
 
@@ -148,33 +142,11 @@ public:
         {
             RTCRay eray;
             initRay(rays, i, eray);
-            rtcOccluded1Ex(scene, &context, eray);
+            rtcOccluded1(scene, &context, &eray);
 
-            if (eray.geomID == 0)
-                rays.far[i] = 0.0f;
+            if (eray.tfar < 0.f)
+                rays.far[i] = 0.f;
         }
-    }
-
-private:
-    FORCEINLINE void initRay(const RayStream<streamSize>& rays, int i, RTCRay& eray)
-    {
-        eray.org[0] = rays.org.x[i];
-        eray.org[1] = rays.org.y[i];
-        eray.org[2] = rays.org.z[i];
-
-        eray.dir[0] = rays.dir.x[i];
-        eray.dir[1] = rays.dir.y[i];
-        eray.dir[2] = rays.dir.z[i];
-
-        eray.tnear = 0.0f;
-        eray.tfar = rays.far[i];
-
-        eray.geomID = RTC_INVALID_GEOMETRY_ID;
-        eray.primID = RTC_INVALID_GEOMETRY_ID;
-        //eray.instID = RTC_INVALID_GEOMETRY_ID;
-
-        eray.mask = -1;
-        eray.time = 0.0f;
     }
 };
 
@@ -199,19 +171,21 @@ public:
 
 #if SIMD_SIZE == 16
             vint16 emask = select(mask, vint16(-1), zero);
-            RTCRay16 eray;
-            initRay(ray, eray);
-            rtcIntersect16Ex(&emask, scene, &context, eray);
+            RTCRayHit16 eray;
+            initRay(ray, eray.ray);
+            initHit(eray.hit);
+            rtcIntersect16((const int*)&emask, scene, &context, &eray);
 #else
-            RTCRay8 eray;
-            initRay(ray, eray);
-            rtcIntersect8Ex(&mask, scene, &context, eray);
+            RTCRayHit8 eray;
+            initRay(ray, eray.ray);
+            initHit(eray.hit);
+            rtcIntersect8((const int*)&mask, scene, &context, &eray);
 #endif
 
-            rays.far.setA(i, load(eray.tfar));
-            hits.primId.setA(i, load((int*)eray.primID));
-            hits.u.setA(i, load(eray.u));
-            hits.v.setA(i, load(eray.v));
+            rays.far.setA(i, load(eray.ray.tfar));
+            hits.primId.setA(i, load((int*)eray.hit.primID));
+            hits.u.setA(i, load(eray.hit.u));
+            hits.v.setA(i, load(eray.hit.v));
         }
     }
 
@@ -232,40 +206,89 @@ public:
             vint16 emask = select(mask, vint16(-1), zero);
             RTCRay16 eray;
             initRay(ray, eray);
-            rtcOccluded16Ex(&emask, scene, &context, eray);
+            rtcOccluded16((const int*)&emask, scene, &context, &eray);
 #else
             RTCRay8 eray;
             initRay(ray, eray);
-            rtcOccluded8Ex(&mask, scene, &context, eray);
+            rtcOccluded8((const int*)&mask, scene, &context, &eray);
 #endif
 
-            vbool hitMask = load((int*)eray.geomID) == vint(zero);
-            ray.far = select(hitMask, vfloat(zero), ray.far);
+            ray.far = load(eray.tfar);
+            ray.far = select(ray.far < vfloat(zero), vfloat(zero), ray.far);
             rays.far.setA(i, ray.far);
         }
     }
+};
 
-private:
-    template <class RTCRayT>
-    FORCEINLINE void initRay(const RaySimd& ray, RTCRayT& eray)
+// SOA intersector only for testing
+template <int streamSize>
+class EmbreeIntersectorStreamSoa : public IntersectorStream<streamSize>, EmbreeIntersector
+{
+public:
+    EmbreeIntersectorStreamSoa(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
+
+    void intersect(RayStream<streamSize>& rays, HitStream<streamSize>& hits, int count, RayStats& stats, RayHint hint)
     {
-        store(eray.orgx, ray.org.x);
-        store(eray.orgy, ray.org.y);
-        store(eray.orgz, ray.org.z);
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
 
-        store(eray.dirx, ray.dir.x);
-        store(eray.diry, ray.dir.y);
-        store(eray.dirz, ray.dir.z);
+        RTCRayHitNt<simdSize> erays[streamSize/simdSize];
+        stats.rayCount += count;
 
-        store(eray.tnear, vfloat(zero));
-        store(eray.tfar, ray.far);
+        for (int i = 0; i < count; i += simdSize)
+        {
+            vbool mask = (vint(step) + i) < count;
+            RaySimd ray;
+            rays.getA(i, ray);
+            ray.far = select(mask, ray.far, negInf);
 
-        store((int*)eray.geomID, vint(RTC_INVALID_GEOMETRY_ID));
-        store((int*)eray.primID, vint(RTC_INVALID_GEOMETRY_ID));
-        //store((int*)eray.instID, vint(RTC_INVALID_GEOMETRY_ID));
+            RTCRayHitNt<simdSize>& eray = erays[i/simdSize];
+            initRay(ray, eray.ray);
+            initHit(eray.hit);
+        }
 
-        store((int*)eray.mask, vint(-1));
-        store(eray.time, vfloat(zero));
+        rtcIntersectNM(scene, &context, (RTCRayHitN*)erays, simdSize, (count+simdSize-1)/simdSize, sizeof(RTCRayHitNt<simdSize>));
+
+        for (int i = 0; i < count; i += simdSize)
+        {
+            const RTCRayHitNt<simdSize>& eray = erays[i/simdSize];
+
+            rays.far.setA(i, load(eray.ray.tfar));
+            hits.primId.setA(i, load((int*)eray.hit.primID));
+            hits.u.setA(i, load(eray.hit.u));
+            hits.v.setA(i, load(eray.hit.v));
+        }
+    }
+
+    void occluded(RayStream<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        RTCRayNt<simdSize> erays[streamSize/simdSize];
+        stats.rayCount += count;
+
+        for (int i = 0; i < count; i += simdSize)
+        {
+            vbool mask = (vint(step) + i) < count;
+            RaySimd ray;
+            rays.getA(i, ray);
+            ray.far = select(mask, ray.far, negInf);
+
+            RTCRayNt<simdSize>& eray = erays[i/simdSize];
+            initRay(ray, eray);
+        }
+
+        rtcOccludedNM(scene, &context, (RTCRayN*)erays, simdSize, (count+simdSize-1)/simdSize, sizeof(RTCRayNt<simdSize>));
+
+        for (int i = 0; i < count; i += simdSize)
+        {
+            const RTCRayNt<simdSize>& eray = erays[i/simdSize];
+
+            vfloat far = load(eray.tfar);
+            far = select(far < vfloat(zero), vfloat(zero), far);
+            rays.far.setA(i, far);
+        }
     }
 };
 

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -24,6 +24,8 @@ std::string getFilenameBase(const std::string& filename);
 std::string getFilenameExt(const std::string& filename);
 std::string getFilenamePrefix(const std::string& filename);
 std::string convertFilename(const std::string& filename);
+
+bool isDirectory(const std::string& filename);
 
 std::string getTempPath();
 void setTempPath(const std::string& path);

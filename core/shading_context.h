@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -22,48 +22,25 @@
 
 namespace prt {
 
-const int shadingContextDataSize = 4096;
-
 class ShadingContext
 {
 public:
     Vec3f p;         // position
-    Vec3f U;         // shading tangent
-    Vec3f V;         // shading bitangent
-    Vec3f N;         // shading normal
+    Basis3f f;       // shading frame
     Vec3f Ng;        // geometric normal
     Vec2f uv;        // texture coords
     bool backfacing; // is the geometry backfacing?
     float eps;       // intersection epsilon
 
-private:
-    // Dynamically allocated data
-    char* ptr;
-    ALIGNED_SIMD char data[shadingContextDataSize];
-
 public:
-    FORCEINLINE void begin()
+    FORCEINLINE const Basis3f& getFrame() const
     {
-        ptr = data;
+        return f;
     }
 
-    template <class T, class... Args>
-    FORCEINLINE T* make(Args&&... args)
+    FORCEINLINE const Vec3f& getN() const
     {
-        T* obj = (T*)ptr;
-        new (obj) T(std::forward<Args>(args)...);
-        ptr += sizeof(T);
-        return obj;
-    }
-
-    FORCEINLINE Basis3f getBasis() const
-    {
-        return Basis3f(U, V, N);
-    }
-
-    FORCEINLINE Vec3f getN() const
-    {
-        return N;
+        return f.N;
     }
 };
 
@@ -71,42 +48,21 @@ class ShadingContextSimd
 {
 public:
     Vec3vf p;         // position
-    Vec3vf U;         // shading tangent
-    Vec3vf V;         // shading bitangent
-    Vec3vf N;         // shading normal
+    Basis3vf f;       // shading frame
     Vec3vf Ng;        // geometric normal
     Vec2vf uv;        // texture coords
     vbool backfacing; // is the geometry backfacing?
     vfloat eps;       // intersection epsilon
 
-private:
-    // Dynamically allocated data
-    char* ptr;
-    ALIGNED_SIMD char data[shadingContextDataSize];
-
 public:
-    FORCEINLINE void begin()
+    FORCEINLINE const Basis3vf& getFrame() const
     {
-        ptr = data;
+        return f;
     }
 
-    template <class T, class... Args>
-    FORCEINLINE T* make(Args&&... args)
+    FORCEINLINE const Vec3vf& getN() const
     {
-        T* obj = (T*)ptr;
-        new (obj) T(std::forward<Args>(args)...);
-        ptr += sizeof(T);
-        return obj;
-    }
-
-    FORCEINLINE Basis3vf getBasis() const
-    {
-        return Basis3vf(U, V, N);
-    }
-
-    FORCEINLINE Vec3vf getN() const
-    {
-        return N;
+        return f.N;
     }
 };
 
@@ -117,9 +73,9 @@ public:
     Vec3f Ng;  // geometric normal
     float eps; // intersection epsilon
 
-    FORCEINLINE Basis3f getBasis() const
+    FORCEINLINE Basis3f getFrame() const
     {
-        return makeBasis(Ng);
+        return makeFrame(Ng);
     }
 
     FORCEINLINE Vec3f getN() const
@@ -135,9 +91,9 @@ public:
     Vec3vf Ng;  // geometric normal
     vfloat eps; // intersection epsilon
 
-    FORCEINLINE Basis3vf getBasis() const
+    FORCEINLINE Basis3vf getFrame() const
     {
-        return makeBasis(Ng);
+        return makeFrame(Ng);
     }
 
     FORCEINLINE Vec3vf getN() const

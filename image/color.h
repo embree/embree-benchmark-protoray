@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,7 @@
 #pragma once
 
 #include "math/vec3.h"
+#include "math/vec4.h"
 
 namespace prt {
 
@@ -26,6 +27,7 @@ FORCEINLINE T average(const Vec3<T>& c)
     return (c.x + c.y + c.z) * (1.0f/3.0f);
 }
 
+// Linear RGB to luminance
 template <class T>
 FORCEINLINE T luminance(const Vec3<T>& c)
 {

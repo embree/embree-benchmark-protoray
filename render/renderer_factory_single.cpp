@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -22,6 +22,7 @@
 #include "ao_integrator_single.h"
 #include "ao_hit_integrator_single.h"
 #include "diffuse_integrator_single.h"
+#include "diffuse2_integrator_single.h"
 #include "debug_integrator_single.h"
 #include "renderer_factory_single.h"
 
@@ -56,6 +57,10 @@ ref<Renderer> RendererFactorySingle::makeWithSampler(const std::string& type, co
         return makeRef<RendererSingle<DiffuseIntegratorSingle<ShadingContext, Sampler>, Sampler>>(scene, intersector, props);
     if (type == "diffuseFast")
         return makeRef<RendererSingle<DiffuseIntegratorSingle<SimpleShadingContext, Sampler>, Sampler, false>>(scene, intersector, props);
+    if (type == "diffuse2")
+        return makeRef<RendererSingle<Diffuse2IntegratorSingle<ShadingContext, Sampler>, Sampler>>(scene, intersector, props);
+    if (type == "diffuse2Fast")
+        return makeRef<RendererSingle<Diffuse2IntegratorSingle<SimpleShadingContext, Sampler>, Sampler, false>>(scene, intersector, props);
     if (type == "debug")
         return makeRef<RendererSingle<DebugIntegratorSingle<Sampler>, Sampler>>(scene, intersector, props);
 

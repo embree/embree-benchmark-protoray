@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,6 +17,7 @@
 #pragma once
 
 #include "sys/common.h"
+#include "sys/array.h"
 #include "math/vec3.h"
 
 namespace prt {
@@ -38,7 +39,21 @@ struct ViewSet
     View views[size];
 };
 
+struct Poi
+{
+    Vec3f p;    // position
+    Vec3f N;    // normal
+    float dist; // distance
+
+    Poi() {}
+    Poi(Zero) : p(zero), N(zero), dist(posInf) {}
+    Poi(const Vec3f& p, const Vec3f& N, float dist) : p(p), N(N), dist(dist) {}
+};
+
 void saveViewSet(const std::string& filename, const ViewSet& viewSet);
 void loadViewSet(const std::string& filename, ViewSet& viewSet);
+
+void savePoi(const std::string& filename, const Poi& poi);
+void loadPoiSet(const std::string& filename, Array<Poi>& poiSet);
 
 } // namespace prt

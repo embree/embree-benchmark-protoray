@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 #include <cuda_runtime.h>
+#include <cooperative_groups.h>
 
 #define CUDA_DEV __device__
 #define CUDA_DEV_FORCEINLINE __device__ __inline__
@@ -55,13 +56,11 @@ CUDA_DEV_FORCEINLINE int laneId()
 // Warp-aggregated atomic increment
 CUDA_DEV_FORCEINLINE int atomicIncAgg(int* ctr)
 {
-    int mask = __ballot(1);
-    int first = __ffs(mask) - 1;
-    int res;
-    if (laneId() == first)
-        res = atomicAdd(ctr, __popc(mask));
-    res = __shfl(res, first);
-    return res + __popc(mask & ((1 << laneId()) - 1));
+    auto g = cooperative_groups::coalesced_threads();
+    int warp_res;
+    if (g.thread_rank() == 0)
+        warp_res = atomicAdd(ctr, g.size());
+    return g.shfl(warp_res, 0) + g.thread_rank();
 }
 
 } // namespace prt

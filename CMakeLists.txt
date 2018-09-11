@@ -1,5 +1,5 @@
 ## ======================================================================== ##
-## Copyright 2015-2017 Intel Corporation                                    ##
+## Copyright 2015-2018 Intel Corporation                                    ##
 ##                                                                          ##
 ## Licensed under the Apache License, Version 2.0 (the "License");          ##
 ## you may not use this file except in compliance with the License.         ##
@@ -17,9 +17,13 @@
 project(protoray)
 cmake_minimum_required(VERSION 2.8)
 
+# Modules
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
+# Compiler
 set(CMAKE_CXX_COMPILER "icpc")
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -no-ansi-alias -qopenmp -static-intel -wd1875")
+set(CMAKE_CXX_FLAGS "-std=c++11 -no-ansi-alias -static-intel -wd1875")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -no-inline-max-total-size -inline-factor=200")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g ${CMAKE_CXX_FLAGS_RELEASE}")
@@ -43,26 +47,28 @@ endif()
 
 include_directories(${PROJECT_SOURCE_DIR})
 
+# TBB
+find_package(TBB REQUIRED)
+include_directories(${TBB_INCLUDE_DIR})
+
+# Embree
 option(EMBREE_SUPPORT "Embree support" ON)
 if(EMBREE_SUPPORT)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DEMBREE_SUPPORT")
     set(EMBREE_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/../embree/include CACHE STRING "Embree include path")
-    set(EMBREE_LIBRARY_DIR ${PROJECT_SOURCE_DIR}/../embree-build CACHE STRING "Embree library path")
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${EMBREE_INCLUDE_DIR}/../common/cmake")
-    find_package(TBB REQUIRED)
-    include_directories(${EMBREE_INCLUDE_DIR} ${TBB_INCLUDE_DIR})
+    set(EMBREE_LIBRARY_DIR ${PROJECT_SOURCE_DIR}/../embree/build CACHE STRING "Embree library path")
+    include_directories(${EMBREE_INCLUDE_DIR})
     link_directories(${EMBREE_LIBRARY_DIR})
 endif()
 
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
-
+# CUDA and OptiX
 option(CUDA_SUPPORT "CUDA support" OFF)
 if(CUDA_SUPPORT)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA_SUPPORT")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA_SUPPORT -DPRIME_ATOM32_GCC")
     find_package(CUDA REQUIRED)
     set(CUDA_HOST_COMPILER gcc)
     set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 -DNDEBUG -use_fast_math -Xptxas -v -keep -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_62,code=sm_62")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++11 -O3 -DNDEBUG -use_fast_math -Xptxas -v -keep -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_53,code=sm_53 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_70,code=sm_70")
     include_directories(${CUDA_INCLUDE_DIRS})
 
     set(OPTIX_INSTALL_DIR /opt/optix CACHE STRING "OptiX install path")
@@ -116,6 +122,7 @@ set(SRC_COMMON
     sys/string.h
     sys/sysinfo.cpp
     sys/sysinfo.h
+    sys/tasking.cpp
     sys/tasking.h
     sys/text_reader.cpp
     sys/text_reader.h
@@ -135,6 +142,8 @@ set(SRC_COMMON
     render/po_integrator_packet.h
     render/diffuse_integrator_single.h
     render/diffuse_integrator_packet.h
+    render/diffuse2_integrator_single.h
+    render/diffuse2_integrator_packet.h
     render/debug_integrator_single.h
     render/renderer.h
     render/renderer_single.h
@@ -142,8 +151,14 @@ set(SRC_COMMON
     render/renderer_stream.h
     render/renderer_stream_aos.h
     render/primary_renderer_stream.h
+    render/primary_renderer_stream_aos.h
     render/diffuse_renderer_stream.h
     render/diffuse_renderer_stream_aos.h
+    render/diffuse2_renderer_stream.h
+    render/diffuse2_renderer_stream_aos.h
+    render/ao_renderer_stream.h
+    render/ao_renderer_stream_aos.h
+    render/ao_common_renderer_stream_aos.h
     render/intersector_factory_single.cpp
     render/intersector_factory_single.h
     render/intersector_factory_packet.cpp
@@ -158,6 +173,8 @@ set(SRC_COMMON
     render/renderer_factory_packet.h
     render/renderer_factory_stream.cpp
     render/renderer_factory_stream.h
+    render/renderer_factory_stream_aos.cpp
+    render/renderer_factory_stream_aos.h
     render/scene.cpp
     render/scene.h
     geometry/shape.h
@@ -169,6 +186,7 @@ set(SRC_COMMON
     geometry/triangle_soup.h
     geometry/quad.h
     geometry/vertex.h
+    image/accum_buffer.h
     image/color.h
     image/frame_buffer.cpp
     image/frame_buffer.h
@@ -180,8 +198,6 @@ set(SRC_COMMON
     image/pixel.cpp
     image/pixel.h
     image/tone_mapper.h
-    image/linear_tone_mapper.h
-    image/reinhard_tone_mapper.h
     math/basis3.h
     math/box1.h
     math/box2.h
@@ -189,6 +205,7 @@ set(SRC_COMMON
     math/fast_box3.h
     math/fast_random.h
     math/fast_random_simd.h
+    math/hash.h
     math/math_common.h
     math/math.h
     math/random.h
@@ -293,6 +310,8 @@ if(CUDA_SUPPORT)
         render/primary_renderer_cuda.h
         render/diffuse_renderer_cuda.cu
         render/diffuse_renderer_cuda.h
+        render/diffuse2_renderer_cuda.cu
+        render/diffuse2_renderer_cuda.h
         sampling/random_sampler.cuh
         sampling/shape_sampler.cuh
         sys/common.cuh
@@ -315,6 +334,11 @@ if(NOT APPLE)
     target_link_libraries(protoray rt)
 endif()
 
+# TBB
+target_link_libraries(protoray ${TBB_LIBRARIES})
+
+# Embree
 if(EMBREE_SUPPORT)
-    target_link_libraries(protoray embree ${TBB_LIBRARIES})
+    target_link_libraries(protoray embree3)
 endif()
+

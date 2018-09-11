@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -19,68 +19,20 @@
 
 namespace prt {
 
-FrameBuffer::FrameBuffer(const Vec2i& size)
+FrameBuffer::FrameBuffer(const Vec2i& size, int colorFlags)
+    : color(size, colorFlags)
 {
-    this->size = size;
     invSize = rcp(toFloat(size));
-
-    for (int i = 0; i < 4; ++i)
-        accumBuffer[i] = (float*)alignedAlloc(size.x * size.y * sizeof(float));
-
-    clear();
-}
-
-FrameBuffer::~FrameBuffer()
-{
-    for (int i = 0; i < 4; ++i)
-        alignedFree(accumBuffer[i]);
 }
 
 void FrameBuffer::clear()
 {
-    for (int i = 0; i < 4; ++i)
-    {
-        #pragma omp parallel for
-        for (int j = 0; j < size.x*size.y; ++j)
-            accumBuffer[i][j] = 0.0f;
-    }
+    color.clear();
 }
 
-void FrameBuffer::update(Surface& surface)
+void FrameBuffer::blitLdr(Surface& dest) const
 {
-    #pragma omp parallel for
-    for (int y = 0; y < size.y; ++y)
-    {
-        int i = y * size.x;
-        int* outRow = surface.getRow(y);
-
-        for (int x = 0; x < size.x; x += simdSize)
-        {
-            vfloat r = load(accumBuffer[0] + i);
-            vfloat g = load(accumBuffer[1] + i);
-            vfloat b = load(accumBuffer[2] + i);
-            vfloat w = load(accumBuffer[3] + i);
-
-            Vec3vf d = Vec3vf(r, g, b) * rcp(w);
-            if (toneMapper) d = toneMapper->get(d);
-            store(outRow + x, encodeBgr8(d));
-            i += simdSize;
-        }
-    }
-}
-
-void FrameBuffer::readHdr(Vec3f* dest)
-{
-    #pragma omp parallel for
-    for (int i = 0; i < size.x*size.y; ++i)
-    {
-        float r = accumBuffer[0][i];
-        float g = accumBuffer[1][i];
-        float b = accumBuffer[2][i];
-        float w = accumBuffer[3][i];
-
-        dest[i] = Vec3f(r, g, b) * rcp(w);
-    }
+    color.blitLdr(dest, toneMapper.get());
 }
 
 } // namespace prt

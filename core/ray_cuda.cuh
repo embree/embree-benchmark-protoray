@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,6 +26,16 @@ struct HitCuda
     int primId;
     float u;
     float v;
+
+    CUDA_DEV_FORCEINLINE bool isHit() const
+    {
+        return t >= 0.0f;
+    }
+};
+
+struct AnyHitCuda
+{
+    float t;
 
     CUDA_DEV_FORCEINLINE bool isHit() const
     {

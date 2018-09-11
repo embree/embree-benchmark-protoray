@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -43,7 +43,7 @@ public:
     Vec3f getColor(Ray& ray, IntersectorSingle* intersector, const Scene* scene, Sampler& sampler, IntegratorState<Sampler>& state)
     {
         Hit hit;
-        intersector->intersect(ray, hit, state.rayStats);
+        intersector->intersect(ray, hit, state.rayStats, rayHintCoherent);
         if (!ray.isHit()) return zero;
 
         ShadingContext ctx;
@@ -53,7 +53,7 @@ public:
         for (int i = 0; i < sampleCount; ++i)
         {
             Vec2f s = sampler.get2D(state.sampler, sampleDimBaseSize + 2 * i);
-            ray.init(ctx.p, ctx.getBasis() * cosineSampleHemisphere(s), ctx.eps);
+            ray.init(ctx.p, ctx.getFrame() * cosineSampleHemisphere(s), ctx.eps);
 
             intersector->occluded(ray, state.rayStats);
             if (!ray.isHit()) sum += 1.0f;

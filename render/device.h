@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -22,6 +22,7 @@
 #include "math/vec3.h"
 #include "math/box3.h"
 #include "image/surface.h"
+#include "core/ray.h"
 
 namespace prt {
 
@@ -40,16 +41,16 @@ public:
     virtual void initRenderer(const Props& props, Props& stats) = 0;
     virtual void render(Props& stats) = 0;
     virtual Props queryPixel(int x, int y) = 0;
+    virtual Props queryRay(const Ray& ray) = 0;
 
     // Camera
     virtual void initCamera(const Props& props) = 0;
 
     // Framebuffer
-    virtual void initFrame(const Vec2i& size) = 0;
+    virtual void initFrame(const Vec2i& size, const Props& props) = 0;
     virtual void initToneMapper(const Props& props) = 0;
     virtual void clearFrame() = 0;
-    virtual void updateFrame(Surface& surface) = 0;
-    virtual void readFrameHdr(Vec3f* dest) = 0;
+    virtual void blitFrame(Surface& dest) = 0;
 };
 
 } // namespace prt

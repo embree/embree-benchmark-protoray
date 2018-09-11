@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -17,12 +17,34 @@
 #pragma once
 
 #include "sys/memory.h"
+#include "ray.h"
 #include "ray_embree.h"
 
 namespace prt {
 
+template <class T, int size>
+class RayStreamChannelAos
+{
+private:
+    ALIGNED_CACHE T v[size];
+
+public:
+    FORCEINLINE const T& operator [](size_t i) const
+    {
+        return v[i];
+    }
+
+    FORCEINLINE T& operator [](size_t i)
+    {
+        return v[i];
+    }
+
+    FORCEINLINE const T* get() const { return v; }
+    FORCEINLINE T* get() { return v; }
+};
+
 template <int size>
-class RayHitStreamAos
+class RayStreamAos
 {
 private:
     ALIGNED_CACHE RTCRay v[size];
@@ -30,20 +52,16 @@ private:
 public:
     FORCEINLINE void set(int i, const Ray& ray)
     {
-        v[i].org[0] = ray.org.x;
-        v[i].org[1] = ray.org.y;
-        v[i].org[2] = ray.org.z;
+        v[i].org_x = ray.org.x;
+        v[i].org_y = ray.org.y;
+        v[i].org_z = ray.org.z;
 
-        v[i].dir[0] = ray.dir.x;
-        v[i].dir[1] = ray.dir.y;
-        v[i].dir[2] = ray.dir.z;
+        v[i].dir_x = ray.dir.x;
+        v[i].dir_y = ray.dir.y;
+        v[i].dir_z = ray.dir.z;
 
         v[i].tnear = 0.0f;
         v[i].tfar = ray.far;
-
-        v[i].geomID = RTC_INVALID_GEOMETRY_ID;
-        v[i].primID = RTC_INVALID_GEOMETRY_ID;
-        //v[i].instID = RTC_INVALID_GEOMETRY_ID;
 
         v[i].mask = -1;
         v[i].time = 0.0f;
@@ -51,22 +69,15 @@ public:
 
     FORCEINLINE void getRay(int i, Ray& ray)
     {
-        ray.org.x = v[i].org[0];
-        ray.org.y = v[i].org[1];
-        ray.org.z = v[i].org[2];
+        ray.org.x = v[i].org_x;
+        ray.org.y = v[i].org_y;
+        ray.org.z = v[i].org_z;
 
-        ray.dir.x = v[i].dir[0];
-        ray.dir.y = v[i].dir[1];
-        ray.dir.z = v[i].dir[2];
+        ray.dir.x = v[i].dir_x;
+        ray.dir.y = v[i].dir_y;
+        ray.dir.z = v[i].dir_z;
 
         ray.far = v[i].tfar;
-    }
-
-    FORCEINLINE void getHit(int i, Hit& hit)
-    {
-        hit.primId = v[i].primID;
-        hit.u = v[i].u;
-        hit.v = v[i].v;
     }
 
     FORCEINLINE bool isHit(int i) const
@@ -76,12 +87,12 @@ public:
 
     FORCEINLINE bool isOccluded(int i) const
     {
-        return v[i].geomID == 0;
+        return v[i].tfar < 0.f;
     }
 
     FORCEINLINE bool isNotOccluded(int i) const
     {
-        return v[i].geomID != 0;
+        return v[i].tfar >= 0.f;
     }
 
     FORCEINLINE const RTCRay& operator [](size_t i) const
@@ -96,6 +107,81 @@ public:
 
     FORCEINLINE RTCRay* get() { return v; }
     FORCEINLINE const RTCRay* get() const { return v; }
+};
+
+template <int size>
+class RayHitStreamAos
+{
+private:
+    ALIGNED_CACHE RTCRayHit v[size];
+
+public:
+    FORCEINLINE void set(int i, const Ray& ray)
+    {
+        v[i].ray.org_x = ray.org.x;
+        v[i].ray.org_y = ray.org.y;
+        v[i].ray.org_z = ray.org.z;
+
+        v[i].ray.dir_x = ray.dir.x;
+        v[i].ray.dir_y = ray.dir.y;
+        v[i].ray.dir_z = ray.dir.z;
+
+        v[i].ray.tnear = 0.0f;
+        v[i].ray.tfar = ray.far;
+
+        v[i].ray.mask = -1;
+        v[i].ray.time = 0.0f;
+
+        v[i].hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    }
+
+    FORCEINLINE void getRay(int i, Ray& ray)
+    {
+        ray.org.x = v[i].ray.org_x;
+        ray.org.y = v[i].ray.org_y;
+        ray.org.z = v[i].ray.org_z;
+
+        ray.dir.x = v[i].ray.dir_x;
+        ray.dir.y = v[i].ray.dir_y;
+        ray.dir.z = v[i].ray.dir_z;
+
+        ray.far = v[i].ray.tfar;
+    }
+
+    FORCEINLINE void getHit(int i, Hit& hit)
+    {
+        hit.primId = v[i].hit.primID;
+        hit.u = v[i].hit.u;
+        hit.v = v[i].hit.v;
+    }
+
+    FORCEINLINE bool isHit(int i) const
+    {
+        return v[i].ray.tfar < float(posMax);
+    }
+
+    FORCEINLINE bool isOccluded(int i) const
+    {
+        return v[i].ray.tfar < 0.f;
+    }
+
+    FORCEINLINE bool isNotOccluded(int i) const
+    {
+        return v[i].ray.tfar >= 0.f;
+    }
+
+    FORCEINLINE const RTCRayHit& operator [](size_t i) const
+    {
+        return v[i];
+    }
+
+    FORCEINLINE RTCRayHit& operator [](size_t i)
+    {
+        return v[i];
+    }
+
+    FORCEINLINE RTCRayHit* get() { return v; }
+    FORCEINLINE const RTCRayHit* get() const { return v; }
 };
 
 } // namespace prt

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -57,17 +57,17 @@ public:
     // Renderer
     void initRenderer(const Props& props, Props& stats);
     void render(Props& stats);
+    Props queryRay(const Ray& ray);
     Props queryPixel(int x, int y);
 
     // Camera
     void initCamera(const Props& props);
 
     // Film
-    void initFrame(const Vec2i& size);
+    void initFrame(const Vec2i& size, const Props& props);
     void initToneMapper(const Props& props);
     void clearFrame();
-    void updateFrame(Surface& surface);
-    void readFrameHdr(Vec3f* dest);
+    void blitFrame(Surface& dest);
 };
 
 } // namespace prt

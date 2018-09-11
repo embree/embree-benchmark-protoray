@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -59,6 +59,16 @@ FORCEINLINE vbool getSimdMaskFromCount(int count)
     return vint(count) > vint::step();
 }
 */
+
+template <class T, int N>
+FORCEINLINE T nextUnique(var<bool,N>& mask, const var<T,N>& vi, var<bool,N>& mask_i)
+{
+    int pos = bitScan(toIntMask(mask));
+    T i = vi[pos];
+    mask_i = mask & (vi == var<T,N>(i));
+    mask = andn(mask, mask_i);
+    return i;
+}
 
 // Conversion functions
 // --------------------

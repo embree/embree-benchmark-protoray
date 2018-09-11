@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -106,10 +106,10 @@ PrimaryRendererCuda::PrimaryRendererCuda(const TriangleMeshCuda& mesh, Intersect
     cudaMalloc(&hits, imageSize * sizeof(HitCuda));
     cudaMalloc(&pixelIds, imageSize * sizeof(int));
 
-    cudaFuncSetCacheConfig(generateRaysKernel<PinholeCameraCuda>, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(generateRaysKernel<ThinLensCameraCuda>, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(shadeRaysKernel<ShadingContextCuda, true>, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(shadeRaysKernel<SimpleShadingContextCuda, false>, cudaFuncCachePreferL1);
+    cudaFuncSetAttribute(generateRaysKernel<PinholeCameraCuda>,            cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
+    cudaFuncSetAttribute(generateRaysKernel<ThinLensCameraCuda>,           cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
+    cudaFuncSetAttribute(shadeRaysKernel<ShadingContextCuda, true>,        cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
+    cudaFuncSetAttribute(shadeRaysKernel<SimpleShadingContextCuda, false>, cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
 }
 
 PrimaryRendererCuda::~PrimaryRendererCuda()

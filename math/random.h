@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -96,6 +96,11 @@ public:
         return (getUint() & 0xffffff) / (float)(1 << 24);
 	}
 
+    float getFloat(float a, float b)
+    {
+        return a + getFloat() * (b-a);
+    }
+
     Vec2f getFloat2()
 	{
 		return Vec2f(getFloat(), getFloat());
@@ -105,6 +110,11 @@ public:
 	{
 		return Vec3f(getFloat(), getFloat(), getFloat());
 	}
+
+    int getInt(int a, int b)
+    {
+        return min(a + int(getFloat() * (b-a+1)), b);
+    }
 };
 
 inline int generateRandomSeed()

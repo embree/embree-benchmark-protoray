@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -34,10 +34,10 @@ public:
 
         stats.rayCount += count;
 
-        rtcIntersect1M(scene, &context, rays.get(), count, sizeof(RTCRay));
+        rtcIntersect1M(scene, &context, rays.get(), count, sizeof(RTCRayHit));
     }
 
-    void occluded(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    void occluded(RayStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
     {
         RTCIntersectContext context;
         initIntersectContext(context, hint);
@@ -62,10 +62,10 @@ public:
         stats.rayCount += count;
 
         for (int i = 0; i < count; ++i)
-            rtcIntersect1Ex(scene, &context, rays[i]);
+            rtcIntersect1(scene, &context, &rays[i]);
     }
 
-    void occluded(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    void occluded(RayStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
     {
         RTCIntersectContext context;
         initIntersectContext(context, hint);
@@ -73,7 +73,43 @@ public:
         stats.rayCount += count;
 
         for (int i = 0; i < count; ++i)
-            rtcOccluded1Ex(scene, &context, rays[i]);
+            rtcOccluded1(scene, &context, &rays[i]);
+    }
+};
+
+// AOP intersector only for testing
+template <int streamSize>
+class EmbreeIntersectorStreamAop : public IntersectorStreamAos<streamSize>, EmbreeIntersector
+{
+public:
+    EmbreeIntersectorStreamAop(ref<const TriangleMesh> mesh, const Props& props, Props& stats) : EmbreeIntersector(mesh, props, stats) {}
+
+    void intersect(RayHitStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += count;
+
+        RTCRayHit* rayPtrs[streamSize];
+        for (int i = 0; i < count; ++i)
+            rayPtrs[i] = &rays[i];
+
+        rtcIntersect1Mp(scene, &context, rayPtrs, count);
+    }
+
+    void occluded(RayStreamAos<streamSize>& rays, int count, RayStats& stats, RayHint hint)
+    {
+        RTCIntersectContext context;
+        initIntersectContext(context, hint);
+
+        stats.rayCount += count;
+
+        RTCRay* rayPtrs[streamSize];
+        for (int i = 0; i < count; ++i)
+            rayPtrs[i] = &rays[i];
+
+        rtcOccluded1Mp(scene, &context, rayPtrs, count);
     }
 };
 

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -39,14 +39,16 @@ FORCEINLINE T sqr(const T& x)
     return x * x;
 }
 
-FORCEINLINE float degToRad(float x)
+template <class T>
+FORCEINLINE T degToRad(T x)
 {
-    return x * (float(pi)/180.0f);
+    return x * (float(pi)/T(180.f));
 }
 
-FORCEINLINE float radToDeg(float x)
+template <class T>
+FORCEINLINE T radToDeg(T x)
 {
-    return x * (180.0f/float(pi));
+    return x * (T(180.f)/float(pi));
 }
 
 template <class T>
@@ -75,10 +77,23 @@ FORCEINLINE T clamp(const T& value, const T& minValue, const T& maxValue)
     return min(max(value, minValue), maxValue);
 }
 
+// Clamp between 0 and 1
+template <class T>
+FORCEINLINE T clamp(const T& value)
+{
+    return min(max(value, T(0)), T(1));
+}
+
 template <class T, class S>
 FORCEINLINE T lerp(const T& a, const T& b, const S& s)
 {
     return a + s * (b - a);
+}
+
+template <class T>
+FORCEINLINE T frac(const T& x)
+{
+    return x - floor(x);
 }
 
 template <class T>
@@ -94,10 +109,16 @@ FORCEINLINE T smoothStep(const T& edge0, const T& edge1, const T& x)
     return t * t * (T(3.0f) - T(2.0f) * t);
 }
 
-// Does not return infinity for 0!
+// Does not return infinity for 0
 FORCEINLINE float rcpSafe(float x)
 {
-    return x == 0.0f ? posMax : rcp(x);
+    return x == 0.f ? posMax : rcp(x);
+}
+
+// Does not return infinity for 0
+FORCEINLINE float rsqrtSafe(float x)
+{
+    return x == 0.f ? posMax : rsqrt(x);
 }
 
 // Does not return NaN

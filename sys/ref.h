@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -40,6 +40,12 @@ public:
 
     template <class T1, class... Args>
     friend ref<T1> makeRef(Args&&... args);
+
+    template <class T1, class T>
+    friend ref<T1> staticRefCast(const ref<T>& r);
+
+    template <class T1, class T>
+    friend ref<T1> dynamicRefCast(const ref<T>& r);
 
     FORCEINLINE ref() : ptr(0) {}
 
@@ -194,6 +200,24 @@ FORCEINLINE ref<T> makeRef(Args&&... args)
     }
 
     return ref<T>(ptr, data);
+}
+
+template <class T1, class T>
+FORCEINLINE ref<T1> staticRefCast(const ref<T>& r)
+{
+    ref<T1> r1;
+    r1.ptr = static_cast<T1*>(r.ptr);
+    r1.incRef();
+    return r1;
+}
+
+template <class T1, class T>
+FORCEINLINE ref<T1> dynamicRefCast(const ref<T>& r)
+{
+    ref<T1> r1;
+    r1.ptr = dynamic_cast<T1*>(r.ptr);
+    r1.incRef();
+    return r1;
 }
 
 } // namespace prt

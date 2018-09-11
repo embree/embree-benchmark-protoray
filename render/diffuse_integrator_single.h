@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -48,7 +48,9 @@ public:
         int depth = 0;
         for (; ;)
         {
-            intersector->intersect(ray, hit, state.rayStats);
+            RayHint rayHint = (depth == 0) ? rayHintCoherent : rayHintIncoherent;
+            intersector->intersect(ray, hit, state.rayStats, rayHint);
+
             if (!ray.isHit() || depth == maxDepth)
                 break;
 
@@ -58,7 +60,7 @@ public:
             scene->postIntersect(ray, hit, ctx);
 
             Vec2f s = sampler.get2D(state.sampler, sampleDimBaseSize + 2 * depth);
-            ray.init(ctx.p, ctx.getBasis() * cosineSampleHemisphere(s), ctx.eps);
+            ray.init(ctx.p, ctx.getFrame() * cosineSampleHemisphere(s), ctx.eps);
             depth++;
         }
 

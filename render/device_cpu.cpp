@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -46,6 +46,11 @@ void DeviceCpu::render(Props& stats)
     stats = DeviceCpuImpl::render(impl, stats);
 }
 
+Props DeviceCpu::queryRay(const Ray& ray)
+{
+    return DeviceCpuImpl::queryRay(impl, ray);
+}
+
 Props DeviceCpu::queryPixel(int x, int y)
 {
     return DeviceCpuImpl::queryPixel(impl, x, y);
@@ -66,9 +71,9 @@ void DeviceCpu::initCamera(const Props& props)
     DeviceCpuImpl::initCamera(impl, props);
 }
 
-void DeviceCpu::initFrame(const Vec2i& size)
+void DeviceCpu::initFrame(const Vec2i& size, const Props& props)
 {
-    DeviceCpuImpl::initFrame(impl, size);
+    DeviceCpuImpl::initFrame(impl, size, props);
 }
 
 void DeviceCpu::initToneMapper(const Props& props)
@@ -81,14 +86,9 @@ void DeviceCpu::clearFrame()
     DeviceCpuImpl::clearFrame(impl);
 }
 
-void DeviceCpu::updateFrame(Surface& surface)
+void DeviceCpu::blitFrame(Surface& dest)
 {
-    DeviceCpuImpl::updateFrame(impl, surface);
-}
-
-void DeviceCpu::readFrameHdr(Vec3f* dest)
-{
-    DeviceCpuImpl::readFrameHdr(impl, dest);
+    DeviceCpuImpl::blitFrame(impl, dest);
 }
 
 } // namespace prt

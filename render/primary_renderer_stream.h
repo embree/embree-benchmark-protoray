@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -48,21 +48,20 @@ private:
     const Camera* camera;
     FrameBuffer* frameBuffer;
     Array<ref<State>> states;
-    Vec2i imageSize;
     int pass;
     bool isStatic;
 
 public:
     PrimaryRendererStream(const ref<const Scene>& scene, const ref<IntersectorStream<streamSize>>& intersector, const Props& props)
+        : Renderer(props)
     {
         this->scene = scene;
         this->intersector = intersector;
-        imageSize = props.get<Vec2i>("imageSize");
 
         // Initialize the sampler
-        int sampleCount = 64*1024; // FIXME
+        int sampleCount = props.get("spp", 0);
         int pixelCount = imageSize.x * imageSize.y;
-        sampler.init(getSampleSize(), sampleCount, pixelCount);
+        sampler.init(getSampleSize(), sampleCount, pixelCount, seed);
 
         states.alloc(cpuCount);
         for (int i = 0; i < states.getSize(); ++i)
@@ -80,7 +79,6 @@ public:
         this->camera = camera;
         this->frameBuffer = frameBuffer;
 
-        Vec2i imageSize = frameBuffer->getSize();
         Vec2i tileSize = Vec2i(tileSizeX, tileSizeY);
         Vec2i gridSize = (imageSize + tileSize - 1) / tileSize;
         Timer timer;
@@ -165,16 +163,16 @@ private:
 
             vint pixelId = state->pixelId.getA(i);
             if (accum)
-                frameBuffer->add(pixelId, color);
+                frameBuffer->getColor().add(pixelId, color);
             else
-                frameBuffer->set(pixelId, color);
+                frameBuffer->getColor().set(pixelId, color);
         }
     }
 
 public:
-    Props queryPixel(const Camera* camera, int x, int y)
+    Props queryRay(const Ray& ray)
     {
-        return RendererStream::queryPixel(intersector, imageSize, camera, x, y);
+        return RendererStream::queryRay(scene, intersector, ray);
     }
 };
 

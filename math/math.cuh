@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -166,7 +166,7 @@ CUDA_DEV_FORCEINLINE float3 operator *(const Basis3f& basis, const float3& a)
 }
 
 // N must be normalized!
-CUDA_DEV_FORCEINLINE void makeBasis(float3& U, float3& V, const float3& N)
+CUDA_DEV_FORCEINLINE void makeFrame(float3& U, float3& V, const float3& N)
 {
     float3 U0 = make_float3(0.0f, N.z, -N.y);
     float3 U1 = make_float3(-N.z, 0.0f, N.x);
@@ -174,12 +174,12 @@ CUDA_DEV_FORCEINLINE void makeBasis(float3& U, float3& V, const float3& N)
     V = normalize(cross(N, U));
 }
 
-CUDA_DEV_FORCEINLINE Basis3f makeBasis(const float3& N)
+CUDA_DEV_FORCEINLINE Basis3f makeFrame(const float3& N)
 {
-    Basis3f basis;
-    makeBasis(basis.U, basis.V, N);
-    basis.N = N;
-    return basis;
+    Basis3f frame;
+    makeFrame(frame.U, frame.V, N);
+    frame.N = N;
+    return frame;
 }
 
 } // namespace prt

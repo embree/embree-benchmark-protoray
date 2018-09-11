@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -30,8 +30,7 @@ static CUDA_DEV_KERNEL void generateRaysKernel(CameraCuda camera,
                                                int pass,
                                                RayCuda* rays,
                                                int* pixelIds,
-                                               unsigned int* samplerStates,
-                                               float* colors)
+                                               unsigned int* samplerStates)
 {
     // Generate rays in Morton order
     int tx = threadIdx.x;
@@ -57,7 +56,6 @@ static CUDA_DEV_KERNEL void generateRaysKernel(CameraCuda camera,
     rays[i] = ray;
     pixelIds[i] = pixelId;
     samplerStates[i] = sampler.getState();
-    colors[i] = 1.0f;
 }
 
 template <class ShadingContextT, bool isAccum>
@@ -67,7 +65,7 @@ static CUDA_DEV_KERNEL void shadeRaysKernel(TriangleMeshCuda mesh,
                                             const HitCuda* hits,
                                             const int* pixelIds, int* pixelIds_o,
                                             const unsigned int* samplerStates, unsigned int* samplerStates_o,
-                                            const float* colors, float* colors_o,
+                                            float throughput,
                                             int* queueSize,
                                             int count,
                                             bool final)
@@ -78,7 +76,7 @@ static CUDA_DEV_KERNEL void shadeRaysKernel(TriangleMeshCuda mesh,
 
     HitCuda hit = hits[i];
     int pixelId = pixelIds[i];
-    float color = colors[i];
+    float color = throughput;
 
     bool isHit = hit.isHit();
 
@@ -95,12 +93,11 @@ static CUDA_DEV_KERNEL void shadeRaysKernel(TriangleMeshCuda mesh,
             RandomSampler sampler;
             sampler.init(samplerStates[i]);
             float2 s = sampler.get2D();
-            ray.init(ctx.p, ctx.getBasis() * cosineSampleHemisphere(s), ctx.eps);
+            ray.init(ctx.p, ctx.getFrame() * cosineSampleHemisphere(s), ctx.eps);
 
             rays_o[o] = ray;
             pixelIds_o[o] = pixelId;
             samplerStates_o[o] = sampler.getState();
-            colors_o[o] = color * 0.8f;
         }
         else
         {
@@ -136,22 +133,25 @@ DiffuseRendererCuda::DiffuseRendererCuda(const TriangleMeshCuda& mesh, Intersect
         cudaMalloc(&rays[i], imageSize * sizeof(RayCuda));
         cudaMalloc(&pixelIds[i], imageSize * sizeof(int));
         cudaMalloc(&samplerStates[i], imageSize * sizeof(int));
-        cudaMalloc(&colors[i], imageSize * sizeof(float));
     }
-
     cudaMalloc(&queueSize, sizeof(int));
 
-    cudaFuncSetCacheConfig(generateRaysKernel<PinholeCameraCuda>, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(generateRaysKernel<ThinLensCameraCuda>, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(shadeRaysKernel<ShadingContextCuda, true>, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(shadeRaysKernel<SimpleShadingContextCuda, false>, cudaFuncCachePreferL1);
+    cudaFuncSetAttribute(generateRaysKernel<PinholeCameraCuda>,            cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
+    cudaFuncSetAttribute(generateRaysKernel<ThinLensCameraCuda>,           cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
+    cudaFuncSetAttribute(shadeRaysKernel<ShadingContextCuda, true>,        cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
+    cudaFuncSetAttribute(shadeRaysKernel<SimpleShadingContextCuda, false>, cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxL1);
 }
 
 DiffuseRendererCuda::~DiffuseRendererCuda()
 {
-    cudaFree(rays);
     cudaFree(hits);
-    cudaFree(pixelIds);
+    for (int i = 0; i < 2; ++i)
+    {
+        cudaFree(rays[i]);
+        cudaFree(pixelIds[i]);
+        cudaFree(samplerStates[i]);
+    }
+    cudaFree(queueSize);
 
     delete intersector;
 }
@@ -169,12 +169,14 @@ int DiffuseRendererCuda::render(const ThinLensCameraCuda& camera, const AccumBuf
     dim3 genBlockSize(32, 4);
     dim3 genGridSize(accumBuffer.size.x / 8, accumBuffer.size.y / 16);
     if (camera.lensRadius == 0.0f)
-        generateRaysKernel<<<genGridSize, genBlockSize>>>((const PinholeCameraCuda&)camera, accumBuffer, pass, rays[buf], pixelIds[buf], samplerStates[buf], colors[buf]);
+        generateRaysKernel<<<genGridSize, genBlockSize>>>((const PinholeCameraCuda&)camera, accumBuffer, pass, rays[buf], pixelIds[buf], samplerStates[buf]);
     else
-        generateRaysKernel<<<genGridSize, genBlockSize>>>(camera, accumBuffer, pass, rays[buf], pixelIds[buf], samplerStates[buf], colors[buf]);
+        generateRaysKernel<<<genGridSize, genBlockSize>>>(camera, accumBuffer, pass, rays[buf], pixelIds[buf], samplerStates[buf]);
 
     dim3 blockSize(256);
     dim3 gridSize((count + blockSize.x - 1) / blockSize.x);
+
+    float throughput = 1.f;
 
     int depth = 0;
     while (count > 0)
@@ -191,12 +193,14 @@ int DiffuseRendererCuda::render(const ThinLensCameraCuda& camera, const AccumBuf
         bool final = depth == maxDepth;
 
         if (isFast)
-            shadeRaysKernel<SimpleShadingContextCuda, false><<<gridSize, blockSize>>>(mesh, accumBuffer, rays[buf], rays[buf2], hits, pixelIds[buf], pixelIds[buf2], samplerStates[buf], samplerStates[buf2], colors[buf], colors[buf2], queueSize, count, final);
+            shadeRaysKernel<SimpleShadingContextCuda, false><<<gridSize, blockSize>>>(mesh, accumBuffer, rays[buf], rays[buf2], hits, pixelIds[buf], pixelIds[buf2], samplerStates[buf], samplerStates[buf2], throughput, queueSize, count, final);
         else
-            shadeRaysKernel<ShadingContextCuda, true><<<gridSize, blockSize>>>(mesh, accumBuffer, rays[buf], rays[buf2], hits, pixelIds[buf], pixelIds[buf2], samplerStates[buf], samplerStates[buf2], colors[buf], colors[buf2], queueSize, count, final);
+            shadeRaysKernel<ShadingContextCuda, true><<<gridSize, blockSize>>>(mesh, accumBuffer, rays[buf], rays[buf2], hits, pixelIds[buf], pixelIds[buf2], samplerStates[buf], samplerStates[buf2], throughput, queueSize, count, final);
 
         if (final)
             break;
+
+        throughput *= 0.8f;
 
         cudaMemcpy(&count, queueSize, sizeof(int), cudaMemcpyDeviceToHost);
         buf = buf2;

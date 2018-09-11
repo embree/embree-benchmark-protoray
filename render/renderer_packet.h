@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "sys/logging.h"
 #include "sys/array.h"
 #include "sys/tasking.h"
 #include "sys/sysinfo.h"
@@ -40,20 +41,19 @@ private:
     const Camera* camera;
     FrameBuffer* frameBuffer;
     Array<IntegratorState<Sampler>> states;
-    Vec2i imageSize;
     int pass;
     bool isStatic;
 
 public:
     RendererPacket(const ref<const Scene>& scene, const ref<IntersectorPacket>& intersector, const Props& props)
-        : integrator(props)
+        : Renderer(props),
+          integrator(props)
     {
         this->scene = scene;
         this->intersector = intersector;
-        imageSize = props.get<Vec2i>("imageSize");
 
         // Initialize the sampler
-        int sampleCount = 64*1024; // FIXME
+        int sampleCount = props.get("spp", 0);
         int pixelCount = imageSize.x * imageSize.y;
         sampler.init(integrator.getSampleSize(), sampleCount, pixelCount);
 
@@ -73,7 +73,6 @@ public:
         this->camera = camera;
         this->frameBuffer = frameBuffer;
 
-        Vec2i imageSize = frameBuffer->getSize();
         Vec2i gridSize = imageSize / Vec2i(tileSizeX, tileSizeY);
         Timer timer;
         Tasking::run(gridSize, [this](const Vec2i& tileId, int tid) { renderTile(tileId, tid); });
@@ -129,51 +128,44 @@ private:
 
                 Vec3vf color = integrator.getColor(ray, intersector.get(), scene.get(), sampler, state);
                 if (accum)
-                    frameBuffer->add(pixelIndex, color);
+                    frameBuffer->getColor().add(pixelIndex, color);
                 else
-                    frameBuffer->set(pixelIndex, color);
+                    frameBuffer->getColor().set(pixelIndex, color);
             }
         }
     }
 
 public:
-    Props queryPixel(const Camera* camera, int x, int y)
+    Props queryRay(const Ray& inputRay)
     {
         Props result;
 
-        CameraSampleSimd cameraSample;
-        cameraSample.lens = zero;
-
-        // Generate a ray through the center of the image plane
-        // We need this to compute the depth
-        RaySimd centerRay;
-        cameraSample.image = Vec2f(0.5f);
-        camera->getRay(centerRay, cameraSample);
-
-        // Generate a ray through the pixel
-        RaySimd ray;
-        cameraSample.image = (Vec2f(x, y) + 0.5f) / toFloat(imageSize);
-        camera->getRay(ray, cameraSample);
-
         // Shoot the ray
+        RaySimd ray;
+        ray.org = inputRay.org;
+        ray.dir = inputRay.dir;
+        ray.far = inputRay.far;
         HitSimd hit;
-        //ShadingContext ctx;
+        ShadingContextSimd ctx;
         RayStats stats;
         intersector->intersect(1, ray, hit, stats);
         if (none(ray.isHit())) return result;
-        //scene->postIntersect(ray, hit, ctx);
+        scene->postIntersect(1, ray, hit, ctx);
+        int primId = *hit.getPrimId();
+        int matId = scene->getMaterialId(primId);
 
         // Fill the query result
-        //result.set("mat", ctx->scene->getMaterialName(ctx));
-        //result.set("matId", ctx.matId);
-        //result.set("prim", hit.id);
-        result.set("depth", toScalar(ray.far * dot(ray.dir, centerRay.dir)));
-        //result.set("p", ray.getHitPoint());
-        //result.set("Ng", ctx.Ng);
-        //result.set("N", ctx.N);
-        //result.set("uv", ctx.uv);
-        //result.set("U", ctx.U);
-        //result.set("V", ctx.V);
+        result.set("mat", scene->getMaterialName(matId));
+        result.set("matId", matId);
+        result.set("prim", primId);
+        result.set("dist", toScalar(ray.far));
+        result.set("p", toScalar(ray.getHitPoint()));
+        result.set("Ng", toScalar(ctx.Ng));
+        result.set("N", toScalar(ctx.f.N));
+        result.set("uv", toScalar(ctx.uv));
+        result.set("U", toScalar(ctx.f.U));
+        result.set("V", toScalar(ctx.f.V));
+        result.set("eps", toScalar(ctx.eps));
 
         return result;
     }

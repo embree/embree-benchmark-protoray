@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -36,7 +36,6 @@ private:
     struct StateIo
     {
         RayStream<streamSize> ray;
-        RayStreamChannel<float, streamSize> throughput;
         RayStreamChannel<int, streamSize> pixelId;
     };
 
@@ -55,23 +54,22 @@ private:
     const Camera* camera;
     FrameBuffer* frameBuffer;
     Array<ref<State>> states;
-    Vec2i imageSize;
     int pass;
     int maxDepth;
     bool isStatic;
 
 public:
     DiffuseRendererStream(const ref<const Scene>& scene, const ref<IntersectorStream<streamSize>>& intersector, const Props& props)
+        : Renderer(props)
     {
         this->scene = scene;
         this->intersector = intersector;
-        imageSize = props.get<Vec2i>("imageSize");
         maxDepth = props.get("maxDepth", 6);
 
         // Initialize the sampler
-        int sampleCount = 64*1024; // FIXME
+        int sampleCount = props.get("spp", 0);
         int pixelCount = imageSize.x * imageSize.y;
-        sampler.init(getSampleSize(), sampleCount, pixelCount);
+        sampler.init(getSampleSize(), sampleCount, pixelCount, seed);
 
         states.alloc(cpuCount);
         for (int i = 0; i < states.getSize(); ++i)
@@ -89,7 +87,6 @@ public:
         this->camera = camera;
         this->frameBuffer = frameBuffer;
 
-        Vec2i imageSize = frameBuffer->getSize();
         Vec2i tileSize = Vec2i(tileSizeX, tileSizeY);
         Vec2i gridSize = (imageSize + tileSize - 1) / tileSize;
         Timer timer;
@@ -128,6 +125,8 @@ private:
         StateIo* stateI = &state->io[0];
         StateIo* stateO = &state->io[1];
 
+        vfloat throughput = 1.f;
+
         Vec2i tileLow = tileId * Vec2i(tileSizeX, tileSizeY);
         int croppedTileSizeY = min(imageSize.y - tileLow.y, tileSizeY);
 
@@ -152,17 +151,15 @@ private:
             camera->getRay(ray, cameraSample);
 
             stateI->ray.setA(i, ray);
-            stateI->throughput.setA(i, 1.0f);
         }
-
-        //int matCount = scene->getMaterialCount();
-        int matCount = 0; // FIXME!!!!!!!!!
 
         int depth = 0;
         for (;;)
         {
             // Intersect rays
-            intersector->intersect(stateI->ray, state->hit, rayCount, state->rayStats);
+            //RayHint rayHint = (depth == 0) ? rayHintCoherent : rayHintIncoherent;
+            RayHint rayHint = rayHintIncoherent; // always use incoherent to avoid frequency drop on SKX
+            intersector->intersect(stateI->ray, state->hit, rayCount, state->rayStats, rayHint);
 
             // Sort
             int missCount = rayStreamSort(stateI->ray, state->pathId.get(), rayCount);
@@ -171,14 +168,13 @@ private:
             for (int i = 0; i < missCount; i += simdSize)
             {
                 vbool m = (vint(step) + i) < missCount;
-                vint pathId = state->pathId.get(i);
+                vint pathId = state->pathId.getA(i);
 
                 vint pixelId = stateI->pixelId.get(m, pathId);
-                vfloat throughput = stateI->throughput.get(m, pathId);
                 if (accum)
-                    frameBuffer->add(m, pixelId, Vec3vf(throughput));
+                    frameBuffer->getColor().add(m, pixelId, Vec3vf(throughput));
                 else
-                    frameBuffer->set(m, pixelId, Vec3vf(throughput));
+                    frameBuffer->getColor().set(m, pixelId, Vec3vf(throughput));
             }
 
             if (missCount == rayCount) break;
@@ -190,9 +186,9 @@ private:
                     vint pathId = state->pathId.get(i);
                     vint pixelId = stateI->pixelId.get(m, pathId);
                     if (accum)
-                        frameBuffer->add(m, pixelId, Vec3vf(zero));
+                        frameBuffer->getColor().add(m, pixelId, Vec3vf(zero));
                     else
-                        frameBuffer->set(m, pixelId, Vec3vf(zero));
+                        frameBuffer->getColor().set(m, pixelId, Vec3vf(zero));
                 }
                 break;
             }
@@ -214,14 +210,13 @@ private:
                 vint pixelId = stateI->pixelId.get(m, pathId);
                 sampler.resetSample(m, state->sampler, pass, pixelId);
                 Vec2vf s = sampler.get2D(state->sampler, sampleDimBaseSize + 2 * depth);
-                ray.init(ctx.p, ctx.getBasis() * cosineSampleHemisphere(s), ctx.eps);
-                stateO->ray.set(o, ray);
+                ray.init(ctx.p, ctx.getFrame() * cosineSampleHemisphere(s), ctx.eps);
+                stateO->ray.setA(o, ray);
 
-                vfloat throughput = stateI->throughput.get(m, pathId);
-                throughput *= 0.8f;
-                stateO->throughput.set(o, throughput);
-                stateO->pixelId.set(o, pixelId);
+                stateO->pixelId.setA(o, pixelId);
             }
+
+            throughput *= 0.8f;
 
             rayCount -= missCount;
             swap(stateI, stateO);
@@ -230,9 +225,9 @@ private:
     }
 
 public:
-    Props queryPixel(const Camera* camera, int x, int y)
+    Props queryRay(const Ray& ray)
     {
-        return RendererStream::queryPixel(intersector, imageSize, camera, x, y);
+        return RendererStream::queryRay(scene, intersector, ray);
     }
 };
 

@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -54,6 +54,11 @@ public:
         alloc(other.size);
         memcpy(data, other.data, size.x * size.y * sizeof(T));
         return *this;
+    }
+
+    ~Image()
+    {
+        free();
     }
 
     void alloc(const Vec2i& size)
@@ -119,11 +124,14 @@ private:
 
 typedef Image<Vec4uc> Image4uc; // BGRA uint8
 typedef Image<Vec3f> Image3f;   // RGB float
+typedef Image<float> Image1f;   // float
 
 bool loadImage(const std::string& filename, Image4uc& image);
 bool loadImage(const std::string& filename, Image3f& image);
 
 bool saveImage(const std::string& filename, const Image4uc& image);
+bool saveImage(const std::string& filename, const Image<int>& image);
 bool saveImage(const std::string& filename, const Image3f& image);
+bool saveImage(const std::string& filename, const Image1f& image);
 
 } // namespace prt

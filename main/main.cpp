@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -14,12 +14,11 @@
 // limitations under the License.                                           //
 // ======================================================================== //
 
-#include <iostream>
-
-#ifdef EMBREE_SUPPORT
-#include <tbb/tbb.h>
+#ifdef CUDA_SUPPORT
+#include <cuda_runtime.h>
 #endif
 
+#include <iostream>
 #include "sys/string.h"
 #include "sys/logging.h"
 #include "sys/sysinfo.h"
@@ -52,12 +51,12 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-#ifdef EMBREE_SUPPORT
-    // Workaround for mixing TBB and OpenMP on KNL
-    tbb::task_scheduler_init init;
-
-    #pragma omp parallel
-    {}
+#if CUDA_SUPPORT
+    // Workaround for occasional CUDA freeze
+    int dev;
+    cudaGetDevice(&dev);
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, dev);
 #endif
 
     initLogging();

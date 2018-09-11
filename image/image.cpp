@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -67,14 +67,46 @@ bool saveImage(const std::string& filename, const Image4uc& image)
     return ImageIo::save(filename, desc, image.getData());
 }
 
+bool saveImage(const std::string& filename, const Image<int>& image)
+{
+    if (filename.find(".png") == std::string::npos)
+#ifdef IMAGE_SUPPORT
+        return saveImage(filename + ".png", image);
+#else
+        return saveImage(filename + ".ppm", image);
+#endif
+
+#ifndef __MIC__
+    // Host
+    ImageIo::Desc desc;
+    desc.size = image.getSize();
+    desc.format = pixelFormatBgr8;
+    return ImageIo::save(filename, desc, image.getData());
+#else
+    // Device
+    throw std::runtime_error("saveImage not implemented");
+#endif
+}
+
 bool saveImage(const std::string& filename, const Image3f& image)
 {
-    if (filename.find(".") == std::string::npos)
+    if (filename.find(".exr") == std::string::npos)
         return saveImage(filename + ".exr", image);
 
     ImageIo::Desc desc;
     desc.size = image.getSize();
     desc.format = pixelFormatRgb32f;
+    return ImageIo::save(filename, desc, image.getData());
+}
+
+bool saveImage(const std::string& filename, const Image1f& image)
+{
+    if (filename.find(".exr") == std::string::npos)
+        return saveImage(filename + ".exr", image);
+
+    ImageIo::Desc desc;
+    desc.size = image.getSize();
+    desc.format = pixelFormatR32f;
     return ImageIo::save(filename, desc, image.getData());
 }
 

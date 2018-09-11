@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,45 +26,34 @@ class RendererStreamAos
 {
 public:
     template <int streamSize>
-    static Props queryPixel(const ref<IntersectorStreamAos<streamSize>>& intersector, const Vec2i& imageSize, const Camera* camera, int x, int y)
+    static Props queryRay(const ref<const Scene>& scene, const ref<IntersectorStreamAos<streamSize>>& intersector, const Ray& inputRay)
     {
         Props result;
 
-        CameraSample cameraSample;
-        cameraSample.lens = zero;
-
-        // Generate a ray through the center of the image plane
-        // We need this to compute the depth
-        Ray centerRay;
-        cameraSample.image = Vec2f(0.5f);
-        camera->getRay(centerRay, cameraSample);
-
-        // Generate a ray through the pixel
-        Ray ray;
-        cameraSample.image = (Vec2f(x, y) + 0.5f) / toFloat(imageSize);
-        camera->getRay(ray, cameraSample);
-
         // Shoot the ray
+        Ray ray = inputRay;
         RayHitStreamAos<streamSize> rays;
         rays.set(0, ray);
-        //ShadingContext ctx;
+        ShadingContext ctx;
         RayStats stats;
         intersector->intersect(rays, 1, stats);
         rays.getRay(0, ray);
+        Hit hit;
+        rays.getHit(0, hit);
         if (none(ray.isHit())) return result;
-        //scene->postIntersect(ray, hit, ctx);
+        scene->postIntersect(ray, hit, ctx);
+        int matId = scene->getMaterialId(hit.primId);
 
         // Fill the query result
-        //result.set("mat", ctx->scene->getMaterialName(ctx));
-        //result.set("matId", ctx.matId);
-        //result.set("prim", hit.id);
-        result.set("depth", ray.far * dot(ray.dir, centerRay.dir));
-        //result.set("p", ray.getHitPoint());
-        //result.set("Ng", ctx.Ng);
-        //result.set("N", ctx.N);
-        //result.set("uv", ctx.uv);
-        //result.set("U", ctx.U);
-        //result.set("V", ctx.V);
+        result.set("mat", scene->getMaterialName(matId));
+        result.set("matId", matId);
+        result.set("primId", hit.primId);
+        result.set("dist", ray.far);
+        result.set("p", ray.getHitPoint());
+        result.set("Ng", ctx.Ng);
+        result.set("N", ctx.f.N);
+        result.set("uv", ctx.uv);
+        result.set("eps", ctx.eps);
 
         return result;
     }

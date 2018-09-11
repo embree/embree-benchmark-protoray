@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -28,12 +28,14 @@ class OptixIntersectorStreamCuda : public IntersectorStreamCuda
 private:
     optix::prime::Context context;
     optix::prime::Model model;
-    optix::prime::Query query;
+    optix::prime::Query closestQuery;
+    optix::prime::Query anyQuery;
 
 public:
     OptixIntersectorStreamCuda(const TriangleMeshCuda& mesh, const Props& props, Props& stats);
 
     void intersect(RayCuda* rays, HitCuda* hits, int count);
+    void occluded(RayCuda* rays, AnyHitCuda* hits, int count);
 };
 
 } // namespace prt

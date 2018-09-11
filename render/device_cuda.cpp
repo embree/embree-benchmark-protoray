@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -16,6 +16,7 @@
 
 #include "sys/logging.h"
 #include "sys/filesystem.h"
+#include "sys/tasking.h"
 #include "sys/blob.h"
 #include "sys/timer_cuda.h"
 #include "geometry/triangle_mesh.h"
@@ -24,6 +25,7 @@
 #include "accel/optix/optix_intersector_stream_cuda.h"
 #include "primary_renderer_cuda.h"
 #include "diffuse_renderer_cuda.h"
+#include "diffuse2_renderer_cuda.h"
 #include "device_cuda.h"
 
 namespace prt {
@@ -78,10 +80,14 @@ void DeviceCuda::initRenderer(const Props& props, Props& stats)
         renderer = makeRef<PrimaryRendererCuda>(mesh, intersector.get(), pixelCount);
     else if (type == "primaryFast")
         renderer = makeRef<PrimaryRendererCuda>(mesh, intersector.get(), pixelCount, true);
-    else if (type == "diffuse")    
+    else if (type == "diffuse")
         renderer = makeRef<DiffuseRendererCuda>(mesh, intersector.get(), pixelCount, maxDepth);
     else if (type == "diffuseFast")
         renderer = makeRef<DiffuseRendererCuda>(mesh, intersector.get(), pixelCount, maxDepth, true);
+    else if (type == "diffuse2")
+        renderer = makeRef<Diffuse2RendererCuda>(mesh, intersector.get(), pixelCount, maxDepth);
+    else if (type == "diffuse2Fast")
+        renderer = makeRef<Diffuse2RendererCuda>(mesh, intersector.get(), pixelCount, maxDepth, true);
     else
         throw std::invalid_argument("invalid renderer type");
 }
@@ -100,6 +106,11 @@ void DeviceCuda::render(Props& stats)
     stats.set("mray", mray);
     stats.set("ray", rayCount);
     //stats.set("spp", 1);
+}
+
+Props DeviceCuda::queryRay(const Ray& ray)
+{
+    return Props();
 }
 
 Props DeviceCuda::queryPixel(int x, int y)
@@ -188,7 +199,7 @@ void DeviceCuda::initCamera(const Props& props)
     camera.focalDistance = cameraHost.focalDistance;
 }
 
-void DeviceCuda::initFrame(const Vec2i& size)
+void DeviceCuda::initFrame(const Vec2i& size, const Props& props)
 {
     frameBuffer = makeRef<FrameBufferCuda>(size);
 }
@@ -202,20 +213,18 @@ void DeviceCuda::clearFrame()
     frameBuffer->clear();
 }
 
-void DeviceCuda::updateFrame(Surface& surface)
+void DeviceCuda::blitFrame(Surface& dest)
 {
     const int* in = (const int*)frameBuffer->map();
-    char* out = (char*)surface.data;
+    char* out = (char*)dest.data;
 
-    #pragma omp parallel for
-    for (int y = 0; y < surface.height; ++y)
-        memcpy(out + y * (ptrdiff_t)surface.pitch, in + y * (ptrdiff_t)surface.width, surface.width * sizeof(int));
+    tbb::parallel_for(tbb::blocked_range<int>(0, dest.height), [&](const tbb::blocked_range<int>& r)
+    {
+        for (int y = r.begin(); y != r.end(); ++y)
+            memcpy(out + y * (ptrdiff_t)dest.pitch, in + y * (ptrdiff_t)dest.width, dest.width * sizeof(int));
+    });
 
     frameBuffer->unmap();
-}
-
-void DeviceCuda::readFrameHdr(Vec3f* dest)
-{
 }
 
 } // namespace prt

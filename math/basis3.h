@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -127,7 +127,7 @@ FORCEINLINE Vec3<T> operator *(const Basis3<T>& basis, const Vec3<T>& a)
 
 // w must be normalized!
 template <class T>
-FORCEINLINE void makeBasis(Vec3<T>& U, Vec3<T>& V, const Vec3<T>& N)
+FORCEINLINE void makeFrame(Vec3<T>& U, Vec3<T>& V, const Vec3<T>& N)
 {
     Vec3<T> U0 = Vec3<T>(zero, N.z, -N.y);
     Vec3<T> U1 = Vec3<T>(-N.z, zero, N.x);
@@ -136,12 +136,12 @@ FORCEINLINE void makeBasis(Vec3<T>& U, Vec3<T>& V, const Vec3<T>& N)
 }
 
 template <class T>
-FORCEINLINE Basis3<T> makeBasis(const Vec3<T>& N)
+FORCEINLINE Basis3<T> makeFrame(const Vec3<T>& N)
 {
-    Basis3<T> basis;
-    makeBasis(basis.U, basis.V, N);
-    basis.N = N;
-    return basis;
+    Basis3<T> frame;
+    makeFrame(frame.U, frame.V, N);
+    frame.N = N;
+    return frame;
 }
 
 // Stream operators

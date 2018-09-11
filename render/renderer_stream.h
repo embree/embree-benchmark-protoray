@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2015-2017 Intel Corporation                                    //
+// Copyright 2015-2018 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -26,46 +26,41 @@ class RendererStream
 {
 public:
     template <int streamSize>
-    static Props queryPixel(const ref<IntersectorStream<streamSize>>& intersector, const Vec2i& imageSize, const Camera* camera, int x, int y)
+    static Props queryRay(const ref<const Scene>& scene, const ref<IntersectorStream<streamSize>>& intersector, const Ray& inputRay)
     {
         Props result;
 
-        CameraSampleSimd cameraSample;
-        cameraSample.lens = zero;
-
-        // Generate a ray through the center of the image plane
-        // We need this to compute the depth
-        RaySimd centerRay;
-        cameraSample.image = Vec2f(0.5f);
-        camera->getRay(centerRay, cameraSample);
-
-        // Generate a ray through the pixel
-        RaySimd ray;
-        cameraSample.image = (Vec2f(x, y) + 0.5f) / toFloat(imageSize);
-        camera->getRay(ray, cameraSample);
-
         // Shoot the ray
+        RaySimd ray;
+        ray.org = inputRay.org;
+        ray.dir = inputRay.dir;
+        ray.far = inputRay.far;
         RayStream<streamSize> rays;
         rays.setA(0, ray);
         HitStream<streamSize> hits;
-        //ShadingContext ctx;
+        ShadingContextSimd ctx;
         RayStats stats;
         intersector->intersect(rays, hits, 1, stats);
         rays.getA(0, ray);
+        HitSimd hit;
+        hits.getA(0, hit);
         if (none(ray.isHit())) return result;
-        //scene->postIntersect(ray, hit, ctx);
+        scene->postIntersect(1, ray, hit, ctx);
+        int primId = *hits.getPrimId();
+        int matId = scene->getMaterialId(primId);
 
         // Fill the query result
-        //result.set("mat", ctx->scene->getMaterialName(ctx));
-        //result.set("matId", ctx.matId);
-        //result.set("prim", hit.id);
-        result.set("depth", toScalar(ray.far * dot(ray.dir, centerRay.dir)));
-        //result.set("p", ray.getHitPoint());
-        //result.set("Ng", ctx.Ng);
-        //result.set("N", ctx.N);
-        //result.set("uv", ctx.uv);
-        //result.set("U", ctx.U);
-        //result.set("V", ctx.V);
+        result.set("mat", scene->getMaterialName(matId));
+        result.set("matId", matId);
+        result.set("prim", primId);
+        result.set("dist", toScalar(ray.far));
+        result.set("p", toScalar(ray.getHitPoint()));
+        result.set("Ng", toScalar(ctx.Ng));
+        result.set("N", toScalar(ctx.f.N));
+        result.set("uv", toScalar(ctx.uv));
+        result.set("U", toScalar(ctx.f.U));
+        result.set("V", toScalar(ctx.f.V));
+        result.set("eps", toScalar(ctx.eps));
 
         return result;
     }
