@@ -9,18 +9,14 @@ By default, you have to put the Embree source directory 'embree' in the same dir
 - cd embree
 - mkdir embree-build
 - cd embree-build
-- ccmake ..
-# set CMake variables
-# configure + generate
+- ccmake .. (set CMake variables, configure + generate)
 - make 
 
 - git clone https://github.com/embree/embree-benchmark-protoray.git protoray
 - cd protoray
 - mkdir protoray-build
 - cd protoray-build
-- ccmake ..
-# set CMake variables (including path to "embree" directory)
-# configure + generate
+- ccmake .. (set CMake variables (including path to "embree" directory, configure + generate)
 - make 
 
 For ProtoRay you can set the explicit target ISA with the HOST_ISA CMake option (e.g., CORE-AVX2 for HSW, MIC-AVX512 for KNL, CORE-AVX512 for SKX).
