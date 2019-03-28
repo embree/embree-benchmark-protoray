@@ -170,19 +170,4 @@ FORCEINLINE OutType bitwise_cast(const InType& value)
 	return u.outValue;
 }
 
-// Trait aliases
-// -------------
-
-#if defined(_LIBCPP_VERSION)
-template <class T> using is_trivially_copy_constructible = std::is_trivially_copy_constructible<T>;
-#else
-template <class T> using is_trivially_copy_constructible = std::has_trivial_copy_constructor<T>;
-#endif
-
-#if __GNUC__ == 4 && __GNUC_MINOR__ < 8 && __GLIBCXX__ < 20140000
-template <class T> using is_trivially_destructible = std::has_trivial_destructor<T>;
-#else
-template <class T> using is_trivially_destructible = std::is_trivially_destructible<T>;
-#endif
-
 } // namespace prt

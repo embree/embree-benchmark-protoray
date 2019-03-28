@@ -156,7 +156,7 @@ public:
         T* oldItems = items;
         items = (T*)alignedAlloc(capacity * sizeof(T));
 
-        if (is_trivially_copy_constructible<T>::value)
+        if (std::is_trivially_copy_constructible<T>::value)
         {
             memcpy(items, oldItems, size * sizeof(T));
         }
@@ -329,7 +329,7 @@ private:
         {
             items = (T*)alignedAlloc(size * sizeof(T));
 
-            if (is_trivially_copy_constructible<T>::value)
+            if (std::is_trivially_copy_constructible<T>::value)
             {
                 memcpy(items, other.items, size * sizeof(T));
             }
@@ -359,7 +359,7 @@ inline Stream& operator <<(Stream& osm, const Array<T>& array)
 {
     osm << array.getSize();
 
-    if (is_trivially_copy_constructible<T>::value)
+    if (std::is_trivially_copy_constructible<T>::value)
     {
         osm.write(array.getData(), array.getSize() * sizeof(T));
     }
@@ -379,7 +379,7 @@ inline Stream& operator >>(Stream& ism, Array<T>& array)
     ism >> size;
     array.alloc(size);
 
-    if (is_trivially_copy_constructible<T>::value)
+    if (std::is_trivially_copy_constructible<T>::value)
     {
         ism.readFull(array.getData(), size * sizeof(T));
     }

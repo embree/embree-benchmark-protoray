@@ -24,7 +24,7 @@ namespace prt {
 template <class T>
 class RawArray : Uncopyable
 {
-    static_assert(is_trivially_destructible<T>::value, "data type must be POD");
+    static_assert(std::is_trivially_destructible<T>::value, "data type must be POD");
 
 private:
     T* items;

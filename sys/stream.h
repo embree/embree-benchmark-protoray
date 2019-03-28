@@ -37,7 +37,7 @@ public:
     template <class T>
     FORCEINLINE Stream& operator <<(const T& obj)
     {
-        static_assert(is_trivially_destructible<T>::value, "serialization not implemented");
+        static_assert(std::is_trivially_destructible<T>::value, "serialization not implemented");
         write(&obj, sizeof(obj));
         return *this;
     }
@@ -45,7 +45,7 @@ public:
     template <class T>
     FORCEINLINE Stream& operator >>(T& obj)
     {
-        static_assert(is_trivially_destructible<T>::value, "serialization not implemented");
+        static_assert(std::is_trivially_destructible<T>::value, "serialization not implemented");
         readFull(&obj, sizeof(obj));
         return *this;
     }
