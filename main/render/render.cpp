@@ -21,6 +21,7 @@
 #include "sys/sysinfo.h"
 #include "sys/filesystem.h"
 #include "sys/option.h"
+#include "sys/tasking.h"
 
 #include "render/device_cpu.h"
 #ifdef CUDA_SUPPORT
@@ -118,6 +119,10 @@ bool applyOptions(const Array<Option>& opts)
         else if (opt.name == "temp")
         {
             setTempPath(opt.value);
+        }
+        else if (opt.name == "maxThreads")
+        {
+            Tasking::setMaxThreadCount(opt.value.get<int>());
         }
         else
         {

@@ -13,3 +13,9 @@ int sched_yield()
     return 0;
 }
 #endif
+
+namespace prt {
+
+    int Tasking::maxThreadCount = std::numeric_limits<int>::max();
+
+}

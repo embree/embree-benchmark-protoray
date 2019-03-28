@@ -26,6 +26,9 @@ namespace prt {
 
 class Tasking
 {
+private:
+    static int maxThreadCount;
+
 public:
     template <class Kernel>
     static void run(const Vec2i& gridSize, Kernel&& kernel)
@@ -50,12 +53,17 @@ public:
 
     static int getThreadCount()
     {
-        return tbb::this_task_arena::max_concurrency();
+        return min(tbb::this_task_arena::max_concurrency(), maxThreadCount);
     }
 
     static int getThreadIndex()
     {
         return tbb::this_task_arena::current_thread_index();
+    }
+
+    static void setMaxThreadCount(int count)
+    {
+        maxThreadCount = count;
     }
 };
 
