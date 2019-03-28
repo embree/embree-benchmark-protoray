@@ -75,12 +75,12 @@ using std::swap;
 class Uncopyable
 {
 protected:
-	Uncopyable() {}
-	~Uncopyable() {}
+    Uncopyable() {}
+    ~Uncopyable() {}
 
 private:
-	Uncopyable(const Uncopyable&);
-	const Uncopyable& operator =(const Uncopyable&);
+    Uncopyable(const Uncopyable&);
+    const Uncopyable& operator =(const Uncopyable&);
 };
 
 template <class T>
@@ -159,27 +159,27 @@ FORCEINLINE bool none(bool a) { return !a; }
 template <class OutType, class InType>
 FORCEINLINE OutType bitwise_cast(const InType& value)
 {
-	union
-	{
-		InType inValue;
-		OutType outValue;
-	}
-	u;
+    union
+    {
+        InType inValue;
+        OutType outValue;
+    }
+    u;
 
-	u.inValue = value;
-	return u.outValue;
+    u.inValue = value;
+    return u.outValue;
 }
 
 // Trait aliases
 // -------------
 
-#if defined(_LIBCPP_VERSION)
-template <class T> using is_trivially_copy_constructible = std::is_trivially_copy_constructible<T>;
-#else
+#if __GNUC__ < 5 || (__GNUC__ == 5 && __GNUC_MINOR__ < 1)
 template <class T> using is_trivially_copy_constructible = std::has_trivial_copy_constructor<T>;
+#else
+template <class T> using is_trivially_copy_constructible = std::is_trivially_copy_constructible<T>;
 #endif
 
-#if __GNUC__ == 4 && __GNUC_MINOR__ < 8 && __GLIBCXX__ < 20140000
+#if __GNUC__ == 4 && __GNUC_MINOR__ < 8
 template <class T> using is_trivially_destructible = std::has_trivial_destructor<T>;
 #else
 template <class T> using is_trivially_destructible = std::is_trivially_destructible<T>;
