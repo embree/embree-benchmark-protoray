@@ -34,6 +34,7 @@ namespace prt {
 
 namespace {
 
+std::string inputPath;
 std::string sceneFilename;
 std::string deviceId = "cpu";
 std::string rendererId = "diffuse";
@@ -50,10 +51,11 @@ bool applyOptions(const Array<Option>& opts)
     {
         if (opt.name.empty())
         {
-            sceneFilename = opt.value;
+            sceneFilename = inputPath + std::string(opt.value);
         }
         else if (opt.name == "c" || opt.name == "config")
         {
+            inputPath = getFilenamePrefix(opt.value);
             Array<Option> opts2;
             parseOptions(opt.value, opts2);
             if (!applyOptions(opts2))
